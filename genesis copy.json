@@ -1,0 +1,20 @@
+{
+  "config" : {
+    "chainId" : 381660001,
+    "muirglacierblock" : 0,
+    "londonBlock" : 2592800,
+    "zeroBaseFee" : true,
+    "qbft" : {
+      "blockperiodseconds" : 5,
+      "epochlength" : 30000,
+      "requesttimeoutseconds" : 10
+    }
+  },
+  "nonce" : "0x0",
+  "timestamp" : "0x58ee40ba",
+  "gasLimit" : "0x1fffffffffffff",
+  "difficulty" : "0x1",
+  "mixHash" : "0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365",
+  "coinbase" : "0x0000000000000000000000000000000000000000",
+  "extraData" : "0xf8a4a00000000000000000000000000000000000000000000000000000000000000000f87e946b82bbdfab8d8fa69fe5062035095e44e3e1fd5a949ade1fb6bbcb8427ca8f4018f738c250a843a75094ca5dc7f9dd1ed867a0085d7cd77a9089be55795f9429f5d53d2d8b82817f171ef82b22f60d59defcfa9467dd9178471f8743191b53bab0d7482fb915fd67944604566f53673a038cb32c14a02933aa904656f6c080c0"
+}
