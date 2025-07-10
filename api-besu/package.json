@@ -1,0 +1,22 @@
+{
+  "name": "besu-api",
+  "version": "1.0.0",
+  "description": "API REST para interagir com o contrato inteligente na rede Besu",
+  "main": "api.js",
+  "scripts": {
+    "start": "node api.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "besu",
+    "ethereum",
+    "api",
+    "jmeter"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ethers": "^6.15.0",
+    "express": "^4.21.2"
+  }
+}
