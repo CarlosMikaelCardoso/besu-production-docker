@@ -27,6 +27,8 @@ cleanup() {
 # Função para instalar o Besu e o Java
 install_dependencies() {
     echo "--- Instalando Dependências: Hyperledger Besu ---"
+    # Instala o Docker
+    sudo snap install docker
     # Baixa o pacote do Besu
     wget "https://github.com/hyperledger/besu/releases/download/${BESU_VERSION}/${BESU_TAR_GZ}"
     # Extrai o arquivo tar.gz
@@ -163,7 +165,6 @@ main() {
     echo "----------------------------------------------------------------------"
     echo "Configuração e Execução da Rede Besu Permissionada Concluídas com Sucesso!"
     echo "----------------------------------------------------------------------"
-    echo "Agora você pode prosseguir para a 'Etapa 4: Implantando um Smart Contract (Exemplo com Hardhat)' no seu README.md original."
     echo "Lembre-se que a conta de implantação externa: ${EXTERNAL_DEPLOY_ACCOUNT} já foi adicionada à lista de permissões."
     echo "Você pode interagir com a rede Besu via RPC HTTP em http://127.0.0.1:8545 (para o Node-1) ou outras portas (8546-8550 para os outros nós)."
     echo ""
