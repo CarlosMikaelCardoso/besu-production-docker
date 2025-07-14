@@ -21,9 +21,9 @@
       </ThreadGroup>
       <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request - Transfer">
-          <stringProp name="HTTPSampler.domain">localhost</stringProp>
-          <stringProp name="HTTPSampler.port">8080</stringProp>
-          <stringProp name="HTTPSampler.path">/api/transfer</stringProp>
+          <stringProp name="HTTPSampler.domain">10.126.1.238</stringProp>
+          <stringProp name="HTTPSampler.port">3000</stringProp>
+          <stringProp name="HTTPSampler.path">/transfer</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
@@ -31,10 +31,10 @@
             <collectionProp name="Arguments.arguments">
               <elementProp name="" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&#xd;
-    "contractAddress": "${__P(contractAddress, NOT_FOUND)}",&#xd;
-    "action": "transfer",&#xd;
-    "args": {}&#xd;
+                <stringProp name="Argument.value">{
+    "from": "user_${__threadNum}",
+    "to": "user_${__intSum(${__threadNum},1)}",
+    "amount": 10
 }</stringProp>
                 <stringProp name="Argument.metadata">=</stringProp>
               </elementProp>

@@ -15,7 +15,9 @@ CONTRACT_ADDRESS_FILE="contract_address.txt"
 # --- EXECUÇÃO ---
 
 echo "Passo 1: Executando o Caliper para deploy do contrato e testes..."
-cd ../caliper-benchmarks 
+cd ../caliper-benchmarks
+npm  install  --only=prod  @hyperledger/caliper-cli
+npx caliper bind --caliper-bind-sut besu:latest
 # Executa o Caliper e redireciona a saída para o arquivo de log
 sudo npx caliper launch manager \
   --caliper-benchconfig "$CALIPER_BENCHCONFIG" \

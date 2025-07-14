@@ -5,7 +5,7 @@ JMETER_VERSION="5.6.3"
 JMETER_DIR="apache-jmeter-${JMETER_VERSION}"
 JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
 CONTRACT_ADDRESS_FILE="contract_address.txt"
-
+export JAVA_HOME=../besu-production-docker/jdk-21.0.7
 # Caminhos para os planos de teste
 JMX_OPEN="test_round1_open.jmx"
 JMX_QUERY="test_round2_query.jmx"
