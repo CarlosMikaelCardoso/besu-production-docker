@@ -1,197 +1,101 @@
-version: "3.8"
-
+version: '3.8'
 services:
   node1:
     image: besu-image-local:1.0
     container_name: node1
-    network_mode: "host"
-    command: >
-      --data-path=/opt/besu/data
-      --genesis-file=/opt/besu/genesis.json
-      --rpc-http-enabled
-      --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
-      --host-allowlist="*"
-      --rpc-http-cors-origins="all"
-      --profile=ENTERPRISE
-      --metrics-enabled
-      --rpc-http-host=0.0.0.0
-      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI 
-      --tx-pool-min-gas-price=0 
-      --min-gas-price=0 
-      --rpc-ws-enabled=true 
-      --rpc-ws-port=8645 
-      --tx-pool-limit-by-account-percentage=1 
-      --tx-pool-max-size=4096 
-      --metrics-port=9545
-      --p2p-port=30303
-      --rpc-http-port=8545
-      --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
+    network_mode: host
+    command: '--data-path=/opt/besu/data --genesis-file=/opt/besu/genesis.json --rpc-http-enabled
+      --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM --host-allowlist="*"
+      --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled --rpc-http-host=0.0.0.0
+      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8645  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9545
+      --p2p-port=30303 --rpc-http-port=8545 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
+
+      '
     volumes:
-      - ./genesis.json:/opt/besu/genesis.json
-      - ./Permissioned-Network/Node-1/data:/opt/besu/data
- 
+    - ./genesis.json:/opt/besu/genesis.json
+    - ./Permissioned-Network/Node-1/data:/opt/besu/data
   node2:
     image: besu-image-local:1.0
     container_name: node2
-    network_mode: "host"
-    command: >
-      --data-path=/opt/besu/data
-      --genesis-file=/opt/besu/genesis.json
-      --bootnodes="enode://a9d80688a80eba7e3b4c6fbf4f4c1154edd6e8c47df869b25fdf304fead1cea9fd59cb50ee94282eae16f846a30b2c7539ceab6b29a34e12c5ab3c5351455eb4@127.0.0.1:30303","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
-      --rpc-http-enabled
-      --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
-      --host-allowlist="*"
-      --rpc-http-cors-origins="all"
-      --profile=ENTERPRISE
-      --metrics-enabled
-      --rpc-http-host=0.0.0.0
-      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI 
-      --tx-pool-min-gas-price=0 
-      --min-gas-price=0 
-      --rpc-ws-enabled=true 
-      --rpc-ws-port=8646 
-      --tx-pool-limit-by-account-percentage=1 
-      --tx-pool-max-size=4096 
-      --metrics-port=9546
-      --p2p-port=30304
-      --rpc-http-port=8546
-      --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
+    network_mode: host
+    command: '--data-path=/opt/besu/data --genesis-file=/opt/besu/genesis.json --bootnodes="enode://255d33f09b21d6118b7d16120b7e7c204a26d97b6af54f107468a11cb58ebc56ce9cf7c38d6cdd53b640513e3caf8ec0c5e1339bbb39e282b8b9827f353be4d0@127.0.0.1:30303","enode://f0f3aefbb46fe0b22237e591524890c1edcc5c1998fa4f907d01fe73e2ea40c037f0fc95b9136db3b12b7fa2eb43fa9d07ff1367f8a60496fbc5fc087b980cb3@127.0.0.1:30305","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
+      --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
+      --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
+      --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
+      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8646  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9546
+      --p2p-port=30304 --rpc-http-port=8546 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-    volumes:
-      - ./genesis.json:/opt/besu/genesis.json
-      - ./Permissioned-Network/Node-2/data:/opt/besu/data
 
+      '
+    volumes:
+    - ./genesis.json:/opt/besu/genesis.json
+    - ./Permissioned-Network/Node-2/data:/opt/besu/data
   node3:
     image: besu-image-local:1.0
     container_name: node3
-    network_mode: "host"
-    command: >
-      --data-path=/opt/besu/data
-      --genesis-file=/opt/besu/genesis.json
-      --bootnodes="enode://a9d80688a80eba7e3b4c6fbf4f4c1154edd6e8c47df869b25fdf304fead1cea9fd59cb50ee94282eae16f846a30b2c7539ceab6b29a34e12c5ab3c5351455eb4@127.0.0.1:30303","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
-      --rpc-http-enabled
-      --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
-      --host-allowlist="*"
-      --rpc-http-cors-origins="all"
-      --profile=ENTERPRISE
-      --metrics-enabled
-      --rpc-http-host=0.0.0.0
-      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI 
-      --tx-pool-min-gas-price=0 
-      --min-gas-price=0 
-      --rpc-ws-enabled=true 
-      --rpc-ws-port=8647 
-      --tx-pool-limit-by-account-percentage=1 
-      --tx-pool-max-size=4096 
-      --metrics-port=9547
-      --p2p-port=30305
-      --rpc-http-port=8547
-      --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
+    network_mode: host
+    command: '--data-path=/opt/besu/data --genesis-file=/opt/besu/genesis.json --bootnodes="enode://255d33f09b21d6118b7d16120b7e7c204a26d97b6af54f107468a11cb58ebc56ce9cf7c38d6cdd53b640513e3caf8ec0c5e1339bbb39e282b8b9827f353be4d0@127.0.0.1:30303","enode://f0f3aefbb46fe0b22237e591524890c1edcc5c1998fa4f907d01fe73e2ea40c037f0fc95b9136db3b12b7fa2eb43fa9d07ff1367f8a60496fbc5fc087b980cb3@127.0.0.1:30305","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
+      --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
+      --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
+      --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
+      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8647  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9547
+      --p2p-port=30305 --rpc-http-port=8547 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-    volumes:
-      - ./genesis.json:/opt/besu/genesis.json
-      - ./Permissioned-Network/Node-3/data:/opt/besu/data
 
+      '
+    volumes:
+    - ./genesis.json:/opt/besu/genesis.json
+    - ./Permissioned-Network/Node-3/data:/opt/besu/data
   node4:
     image: besu-image-local:1.0
     container_name: node4
-    network_mode: "host"
-    command: >
-      --data-path=/opt/besu/data
-      --genesis-file=/opt/besu/genesis.json
-      --bootnodes="enode://a9d80688a80eba7e3b4c6fbf4f4c1154edd6e8c47df869b25fdf304fead1cea9fd59cb50ee94282eae16f846a30b2c7539ceab6b29a34e12c5ab3c5351455eb4@127.0.0.1:30303","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
-      --rpc-http-enabled
-      --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
-      --host-allowlist="*"
-      --rpc-http-cors-origins="all"
-      --profile=ENTERPRISE
-      --metrics-enabled
-      --rpc-http-host=0.0.0.0
-      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI 
-      --tx-pool-min-gas-price=0 
-      --min-gas-price=0 
-      --rpc-ws-enabled=true 
-      --rpc-ws-port=8648 
-      --tx-pool-limit-by-account-percentage=1 
-      --tx-pool-max-size=4096 
-      --metrics-port=9548
-      --p2p-port=30306
-      --rpc-http-port=8548
-      --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
+    network_mode: host
+    command: '--data-path=/opt/besu/data --genesis-file=/opt/besu/genesis.json --bootnodes="enode://255d33f09b21d6118b7d16120b7e7c204a26d97b6af54f107468a11cb58ebc56ce9cf7c38d6cdd53b640513e3caf8ec0c5e1339bbb39e282b8b9827f353be4d0@127.0.0.1:30303","enode://f0f3aefbb46fe0b22237e591524890c1edcc5c1998fa4f907d01fe73e2ea40c037f0fc95b9136db3b12b7fa2eb43fa9d07ff1367f8a60496fbc5fc087b980cb3@127.0.0.1:30305","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
+      --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
+      --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
+      --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
+      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8648  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9548
+      --p2p-port=30306 --rpc-http-port=8548 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-    volumes:
-      - ./genesis.json:/opt/besu/genesis.json
-      - ./Permissioned-Network/Node-4/data:/opt/besu/data
 
+      '
+    volumes:
+    - ./genesis.json:/opt/besu/genesis.json
+    - ./Permissioned-Network/Node-4/data:/opt/besu/data
   node5:
     image: besu-image-local:1.0
     container_name: node5
-    network_mode: "host"
-    command: >
-      --data-path=/opt/besu/data
-      --genesis-file=/opt/besu/genesis.json
-      --bootnodes="enode://a9d80688a80eba7e3b4c6fbf4f4c1154edd6e8c47df869b25fdf304fead1cea9fd59cb50ee94282eae16f846a30b2c7539ceab6b29a34e12c5ab3c5351455eb4@127.0.0.1:30303","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
-      --rpc-http-enabled
-      --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
-      --host-allowlist="*"
-      --rpc-http-cors-origins="all"
-      --profile=ENTERPRISE
-      --metrics-enabled
-      --rpc-http-host=0.0.0.0
-      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI 
-      --tx-pool-min-gas-price=0 
-      --min-gas-price=0 
-      --rpc-ws-enabled=true 
-      --rpc-ws-port=8649 
-      --tx-pool-limit-by-account-percentage=1 
-      --tx-pool-max-size=4096 
-      --metrics-port=9549
-      --p2p-port=30307
-      --rpc-http-port=8549
-      --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
+    network_mode: host
+    command: '--data-path=/opt/besu/data --genesis-file=/opt/besu/genesis.json --bootnodes="enode://255d33f09b21d6118b7d16120b7e7c204a26d97b6af54f107468a11cb58ebc56ce9cf7c38d6cdd53b640513e3caf8ec0c5e1339bbb39e282b8b9827f353be4d0@127.0.0.1:30303","enode://f0f3aefbb46fe0b22237e591524890c1edcc5c1998fa4f907d01fe73e2ea40c037f0fc95b9136db3b12b7fa2eb43fa9d07ff1367f8a60496fbc5fc087b980cb3@127.0.0.1:30305","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
+      --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
+      --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
+      --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
+      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8649  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9549
+      --p2p-port=30307 --rpc-http-port=8549 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-    volumes:
-      - ./genesis.json:/opt/besu/genesis.json
-      - ./Permissioned-Network/Node-5/data:/opt/besu/data
 
+      '
+    volumes:
+    - ./genesis.json:/opt/besu/genesis.json
+    - ./Permissioned-Network/Node-5/data:/opt/besu/data
   node6:
     image: besu-image-local:1.0
     container_name: node6
-    network_mode: "host"
-    command: >
-      --data-path=/opt/besu/data
-      --genesis-file=/opt/besu/genesis.json
-      --bootnodes="enode://a9d80688a80eba7e3b4c6fbf4f4c1154edd6e8c47df869b25fdf304fead1cea9fd59cb50ee94282eae16f846a30b2c7539ceab6b29a34e12c5ab3c5351455eb4@127.0.0.1:30303","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
-      --rpc-http-enabled
-      --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
-      --host-allowlist="*"
-      --rpc-http-cors-origins="all"
-      --profile=ENTERPRISE
-      --metrics-enabled
-      --rpc-http-host=0.0.0.0
-      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI 
-      --tx-pool-min-gas-price=0 
-      --min-gas-price=0 
-      --rpc-ws-enabled=true 
-      --rpc-ws-port=8650
-      --tx-pool-limit-by-account-percentage=1 
-      --tx-pool-max-size=4096 
-      --metrics-port=9550
-      --p2p-port=30308
-      --rpc-http-port=8550
-      --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
+    network_mode: host
+    command: '--data-path=/opt/besu/data --genesis-file=/opt/besu/genesis.json --bootnodes="enode://255d33f09b21d6118b7d16120b7e7c204a26d97b6af54f107468a11cb58ebc56ce9cf7c38d6cdd53b640513e3caf8ec0c5e1339bbb39e282b8b9827f353be4d0@127.0.0.1:30303","enode://f0f3aefbb46fe0b22237e591524890c1edcc5c1998fa4f907d01fe73e2ea40c037f0fc95b9136db3b12b7fa2eb43fa9d07ff1367f8a60496fbc5fc087b980cb3@127.0.0.1:30305","enode://6ae0bacb48df10203abff310fa8810d341337b51604f5a3222e0529f18dbe7273a8af36532a74c71496237c7d5ae5064fbdc2e4a73da6bff95a34b7f4a8a10aa@127.0.0.1:30305"
+      --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
+      --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
+      --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
+      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8650
+      --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9550
+      --p2p-port=30308 --rpc-http-port=8550 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-    volumes:
-      - ./genesis.json:/opt/besu/genesis.json
-      - ./Permissioned-Network/Node-6/data:/opt/besu/data
 
+      '
+    volumes:
+    - ./genesis.json:/opt/besu/genesis.json
+    - ./Permissioned-Network/Node-6/data:/opt/besu/data
 networks:
   default:
     name: besu-network
