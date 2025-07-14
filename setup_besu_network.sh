@@ -9,7 +9,7 @@ set -o pipefail  # Aborta se algum comando em um pipeline falhar
 BASE_DIR="$(pwd)" 
 BESU_VERSION="24.7.0"
 JAVA_VERSION="jdk-21.0.7" # Nome do diretório que o JDK será extraído
-JAVA_TAR_GZ="jdk-21_linux-x64_bin.tar.gz"
+JAVA_TAR_GZ="jdk-21.0.7_linux-x64_bin.tar.gz"
 BESU_TAR_GZ="besu-${BESU_VERSION}.tar.gz"
 EXTERNAL_DEPLOY_ACCOUNT="0xfe3b557e8fb62b89f4916b721be55ceb828dbd73" # Conta externa para implantação de contratos, do README.md
 # --- Funções Auxiliares ---
@@ -41,7 +41,7 @@ install_dependencies() {
 
     echo "--- Instalando Dependências: JAVA ---"
     # Baixa o pacote do JDK
-    wget "https://download.oracle.com/java/21/latest/${JAVA_TAR_GZ}"
+    wget "https://download.oracle.com/java/21/archive/${JAVA_TAR_GZ}"
     # Extrai o arquivo tar.gz
     tar -xvf "${JAVA_TAR_GZ}"
     # Remove o arquivo tar.gz após a extração
