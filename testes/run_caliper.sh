@@ -4,18 +4,18 @@
 # Caminho para o arquivo de configuração do benchmark do Caliper
 CALIPER_BENCHCONFIG="benchmarks/scenario/simple/config.yaml"
 # Caminho para o arquivo de configuração de rede do Caliper
-CALIPER_NETWORKCONFIG="networks/besu/1node-clique/networkconfig.json"
+CALIPER_NETWORKCONFIG="../meu-contrato/networkconfig.json"
 # Workspace do Caliper
 CALIPER_WORKSPACE="."
 # Arquivo de log do Caliper
-CALIPER_LOG="caliper_log.txt"
+CALIPER_LOG="../besu-production-docker/testes/caliper_log.txt"
 # Arquivo para salvar o endereço do contrato
-CONTRACT_ADDRESS_FILE="contract_address.txt"
+CONTRACT_ADDRESS_FILE="../besu-production-docker/testes/contract_address.txt"
 
 # --- EXECUÇÃO ---
 
 echo "Passo 1: Executando o Caliper para deploy do contrato e testes..."
-cd ../caliper-benchmarks
+cd ../../caliper-benchmarks
 npm  install  --only=prod  @hyperledger/caliper-cli
 npx caliper bind --caliper-bind-sut besu:latest
 # Executa o Caliper e redireciona a saída para o arquivo de log
