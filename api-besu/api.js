@@ -9,7 +9,9 @@ app.use(express.json());
 const BESU_RPC_URL = "http://localhost:8545";
 const DEPLOYER_PRIVATE_KEY = "0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63";
 
-const CONTRACT_ADDRESS = "0xa50a51c09a5c451C52BB714527E1974b686D8e77";
+// !!! IMPORTANTE: SUBSTITUA ESTE ENDEREÇO PELO ENDEREÇO REAL DO SEU CONTRATO IMPLANTADO !!!
+// Ele deve ser o mesmo que está em 'contract_address.txt'
+const CONTRACT_ADDRESS = "0x42699A7612A82f1d9C36148af9C77354759b210b"; 
 const CONTRACT_ABI = [
     { "constant": false, "inputs": [ { "internalType": "string", "name": "acc_from", "type": "string" }, { "internalType": "string", "name": "acc_to", "type": "string" }, { "internalType": "int256", "name": "amount", "type": "int256" } ], "name": "transfer", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
     { "constant": true, "inputs": [ { "internalType": "string", "name": "acc_id", "type": "string" } ], "name": "query", "outputs": [ { "internalType": "int256", "name": "amount", "type": "int256" } ], "stateMutability": "view", "type": "function" },
@@ -32,11 +34,16 @@ async function transactionWorker() {
     while (transactionQueue.length > 0) {
         const task = transactionQueue.shift();
         try {
+            // Adiciona um log antes de submeter a transação
+            console.log(`Tentando submeter transação: ${task.name} com nonce ${currentNonce}`);
             const tx = await task.action({ nonce: currentNonce });
             console.log(`Transação submetida. Nonce: ${currentNonce}, Hash: ${tx.hash}`);
             currentNonce++;
         } catch (error) {
-            console.error(`Falha ao processar tarefa. Nonce: ${currentNonce}. Erro: ${error.message}`);
+            console.error(`Falha ao processar tarefa '${task.name}'. Nonce: ${currentNonce}. Erro: ${error.message}`);
+            // Em caso de erro, você pode querer tentar novamente ou ter uma estratégia de fallback
+            // Por enquanto, apenas logamos o erro.
+            currentNonce++; // Incrementa o nonce mesmo em caso de falha para evitar nonce stuck
         }
     }
     isProcessing = false;
@@ -53,8 +60,7 @@ app.post('/open', (req, res) => {
     if (!accountId || amount === undefined) {
         return res.status(400).json({ error: "Campos 'accountId' e 'amount' são obrigatórios." });
     }
-    enqueueAndProcess({ action: (opts) => contract.open(accountId, amount, opts) });
-    // ALTERAÇÃO AQUI: Incluindo os dados da requisição na resposta
+    enqueueAndProcess({ name: 'open', action: (opts) => contract.open(accountId, amount, opts) });
     res.status(202).json({ 
         message: "Pedido 'open' recebido e enfileirado.",
         data: req.body 
@@ -66,8 +72,7 @@ app.post('/transfer', (req, res) => {
     if (!from || !to || amount === undefined) {
         return res.status(400).json({ error: "Os campos 'from', 'to' e 'amount' são obrigatórios." });
     }
-    enqueueAndProcess({ action: (opts) => contract.transfer(from, to, amount, opts) });
-    // ALTERAÇÃO AQUI: Incluindo os dados da requisição na resposta
+    enqueueAndProcess({ name: 'transfer', action: (opts) => contract.transfer(from, to, amount, opts) });
     res.status(202).json({ 
         message: "Pedido 'transfer' recebido e enfileirado.",
         data: req.body
@@ -76,9 +81,12 @@ app.post('/transfer', (req, res) => {
 
 app.get('/query/:accountId', async (req, res) => {
     try {
+        // Loga o accountId que está sendo consultado
+        console.log(`Tentando consultar saldo para accountId: ${req.params.accountId}`);
         const balance = await contract.query(req.params.accountId);
         res.status(200).json({ accountId: req.params.accountId, balance: balance.toString() });
     } catch (error) {
+        console.error(`Falha ao executar a função 'query' para accountId: ${req.params.accountId}. Erro: ${error.message}`);
         res.status(500).json({ error: "Falha ao executar a função 'query'.", details: error.message });
     }
 });

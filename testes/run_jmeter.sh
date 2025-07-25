@@ -14,10 +14,68 @@ JMX_TRANSFER="test_round3_transfer.jmx"
 # Array para armazenar os resultados formatados de cada round
 declare -a ROUND_RESULTS
 
+# Função para gerar endereços Ethereum e salvá-los em um CSV
+generate_eth_accounts_csv() {
+  echo "Gerando endereços Ethereum..."
+  local temp_dir="temp_eth_gen"
+  local accounts_file="ethereum_accounts.csv"
+  local num_accounts=1000 # Defina quantas contas você quer gerar
+
+  mkdir -p "$temp_dir"
+  pushd "$temp_dir" > /dev/null # Entra no diretório temporário, silenciando a saída
+
+  # Verifica se o npm está disponível
+  if ! command -v npm &> /dev/null; then
+      echo "Erro: 'npm' não está instalado. Por favor, instale o Node.js e o npm para gerar os endereços."
+      exit 1
+  fi
+
+  # Inicializa projeto Node.js e instala ethers
+  npm init -y > /dev/null 2>&1 # Silencia a saída
+  npm install ethers@^6.0.0 > /dev/null 2>&1 # Instala ethers v6 ou superior, silencia a saída
+
+  if [ $? -ne 0 ]; then
+    echo "Erro: Falha ao instalar 'ethers'. Verifique sua conexão com a internet ou as permissões."
+    popd > /dev/null
+    rm -rf "$temp_dir"
+    exit 1
+  fi
+
+  # Conteúdo do script Node.js para gerar as contas
+  cat <<EOF > generate_accounts.js
+const { Wallet } = require('ethers');
+const fs = require('fs');
+
+const numAccounts = ${num_accounts};
+const outputFileName = '${accounts_file}';
+
+let csvContent = 'accountId\\n'; // Cabeçalho do CSV
+
+for (let i = 0; i < numAccounts; i++) {
+    const wallet = Wallet.createRandom();
+    csvContent += \`\${wallet.address}\\n\`;
+}
+
+fs.writeFileSync(outputFileName, csvContent);
+console.log(\`\${numAccounts} endereços Ethereum gerados e salvos em \${outputFileName}\`);
+EOF
+
+  node generate_accounts.js
+  
+  if [ $? -ne 0 ]; then
+    echo "Erro: Falha ao executar o script Node.js para gerar endereços."
+    popd > /dev/null
+    rm -rf "$temp_dir"
+    exit 1
+  fi
+
+  cp "$accounts_file" ../ # Copia para o diretório pai (onde run_jmeter.sh está)
+  popd > /dev/null # Sai do diretório temporário
+  rm -rf "$temp_dir" # Limpa o diretório temporário
+  echo "Endereços gerados em ./$accounts_file"
+}
+
 # Função para processar o arquivo .jtl e formatar a saída como o Caliper
-# Esta função usará dados hipotéticos para métricas de desempenho, pois os logs fornecidos mostram apenas falhas de conexão.
-# Para um cálculo real, seria necessário um JTL com sucessos e mais complexidade na análise.
-# Modificação na função process_jtl_to_caliper_format para calcular corretamente as métricas dos arquivos .jtl
 process_jtl_to_caliper_format() {
   local jtl_file="$1"
   local round_name="$2"
@@ -30,12 +88,10 @@ process_jtl_to_caliper_format() {
   local throughput="N/A"
 
   if [ -f "$jtl_file" ]; then
-    # Usar AWK para processar o arquivo JTL e extrair todas as métricas em uma única passagem
-    # Colunas: 1=timeStamp, 2=elapsed, 8=success
     read -r success_count fail_count min_latency max_latency avg_latency send_rate throughput <<< \
     $(awk 'BEGIN {
         FS = ",";
-        min_lat_ms = 999999999; # Usar um valor muito alto para min_lat_ms inicial
+        min_lat_ms = 999999999;
         max_lat_ms = 0;
         total_lat_ms = 0;
         count_success = 0;
@@ -44,7 +100,7 @@ process_jtl_to_caliper_format() {
         first_ts = 0;
         last_ts = 0;
     }
-    NR > 1 { # Ignorar o cabeçalho
+    NR > 1 {
         timestamp = $1;
         elapsed = $2;
         success = $8;
@@ -52,7 +108,7 @@ process_jtl_to_caliper_format() {
         if (first_ts == 0) {
             first_ts = timestamp;
         }
-        last_ts = timestamp; # last_ts será sempre o timestamp da última requisição processada
+        last_ts = timestamp;
 
         total_requests++;
 
@@ -72,7 +128,6 @@ process_jtl_to_caliper_format() {
     END {
         if (count_success > 0) {
             avg_lat_ms = total_lat_ms / count_success;
-            # Converter milissegundos para segundos
             min_lat_s = sprintf("%.2f", min_lat_ms / 1000);
             max_lat_s = sprintf("%.2f", max_lat_ms / 1000);
             avg_lat_s = sprintf("%.2f", avg_lat_ms / 1000);
@@ -88,7 +143,7 @@ process_jtl_to_caliper_format() {
             if (duration_ms > 0) {
                 duration_s = sprintf("%.2f", duration_ms / 1000);
             } else {
-                duration_s = "0.00"; # Se for muito rápido, pode ser 0
+                duration_s = "0.00";
             }
         }
         
@@ -96,18 +151,12 @@ process_jtl_to_caliper_format() {
         throughput = "N/A";
 
         if (duration_s != "N/A" && duration_s > 0) {
-            send_rate = sprintf("%.2f", total_requests / duration_s); # Total de requests (sucesso + falha) / duração
+            send_rate = sprintf("%.2f", total_requests / duration_s);
             if (count_success > 0) {
-                throughput = sprintf("%.2f", count_success / duration_s); # Apenas requests de sucesso / duração
+                throughput = sprintf("%.2f", count_success / duration_s);
             } else {
-                throughput = "0.00"; # Se não houver sucessos, throughput é 0
+                throughput = "0.00";
             }
-        } else if (total_requests > 0) {
-             # Caso a duração seja 0 ou N/A mas houve requisições, pode ser um teste muito curto.
-             # Para Send Rate, podemos estimar com base em um tempo mínimo se não houver duração calculável.
-             # Para throughput, se count_success for > 0, usar 0.00 para evitar divisão por zero se duration_s for 0.
-             send_rate = "N/A"; # Não é possível calcular send_rate se duration_s for 0 ou N/A
-             throughput = "N/A"; # Não é possível calcular throughput se duration_s for 0 ou N/A
         }
 
 
@@ -120,8 +169,6 @@ process_jtl_to_caliper_format() {
 }
 
 # --- INSTALAÇÃO AUTOMÁTICA DO JMETER ---
-# Adicionei esta seção para verificar se o diretório do JMeter já existe.
-# Se não existir, o script fará o download e a extração automática dos arquivos.
 if [ ! -d "$JMETER_DIR" ]; then
   echo "Diretório do JMeter não encontrado. Baixando e instalando o JMeter ${JMETER_VERSION}..."
   if ! command -v wget &> /dev/null; then
@@ -147,24 +194,38 @@ fi
 CONTRACT_ADDRESS=$(<"$CONTRACT_ADDRESS_FILE")
 echo "Endereço do contrato a ser utilizado: $CONTRACT_ADDRESS"
 
+# --- GERAR NOVAS CONTAS ETHEREUM E PREPARAR PROPRIEDADES PARA O JMETER ---
+generate_eth_accounts_csv
+ACCOUNT_PROPERTIES=""
+ACCOUNT_INDEX=1
+while IFS= read -r account_id || [[ -n "$account_id" ]]; do
+  # Ignora a linha do cabeçalho
+  if [ "$ACCOUNT_INDEX" -eq 1 ]; then
+    ACCOUNT_INDEX=$((ACCOUNT_INDEX + 1))
+    continue
+  fi
+  ACCOUNT_PROPERTIES+=" -Jaccount_${ACCOUNT_INDEX}=${account_id}"
+  ACCOUNT_INDEX=$((ACCOUNT_INDEX + 1))
+done < ethereum_accounts.csv
 
 # --- EXECUÇÃO DOS TESTES JMETER EM SEQUÊNCIA ---
 echo -e "\n--- Iniciando Testes JMeter ---"
 
 # Executa Round 1: Open
 echo -e "\nPasso 2.1: Executando Round 1: Open..."
-"$JMETER_HOME/jmeter" -n -t "$JMX_OPEN" -l "results_open.jtl" -JcontractAddress="$CONTRACT_ADDRESS"
+"$JMETER_HOME/jmeter" -n -t "$JMX_OPEN" -l "results_open.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
 echo "Round 1 finalizado. Resultados em results_open.jtl"
 
 # Executa Round 2: Query
 echo -e "\nPasso 2.2: Executando Round 2: Query..."
-"$JMETER_HOME/jmeter" -n -t "$JMX_QUERY" -l "results_query.jtl" -JcontractAddress="$CONTRACT_ADDRESS"
+"$JMETER_HOME/jmeter" -n -t "$JMX_QUERY" -l "results_query.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
 echo "Round 2 finalizado. Resultados em results_query.jtl"
 
 # Executa Round 3: Transfer
 echo -e "\nPasso 2.3: Executando Round 3: Transfer..."
-"$JMETER_HOME/jmeter" -n -t "$JMX_TRANSFER" -l "results_transfer.jtl" -JcontractAddress="$CONTRACT_ADDRESS"
+"$JMETER_HOME/jmeter" -n -t "$JMX_TRANSFER" -l "results_transfer.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
 echo "Round 3 finalizado. Resultados em results_transfer.jtl"
+
 
 echo -e "\n--- Sumário de todos os testes JMeter (Formato Caliper) ---"
 echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+"
