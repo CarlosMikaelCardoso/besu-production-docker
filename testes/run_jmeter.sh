@@ -208,25 +208,97 @@ while IFS= read -r account_id || [[ -n "$account_id" ]]; do
   ACCOUNT_INDEX=$((ACCOUNT_INDEX + 1))
 done < ethereum_accounts.csv
 
+# Função para executar o JMeter e coletar métricas de uso de recursos
+run_jmeter_with_metrics() {
+    local jmx_file="$1"
+    local output_jtl="$2"
+    local round_name="$3"
+    local contract_address="$4"
+    local account_properties="$5"
+    # Cria um arquivo temporário para as métricas de recursos deste round
+    local resource_metrics_file="jmeter_resource_metrics_${round_name}.txt"
+
+    echo "Executing JMeter for $round_name..."
+    # Executa o JMeter e captura o uso de recursos usando /usr/bin/time -v.
+    # A saída de erro do time (que contém as métricas) vai para resource_metrics_file.
+    /usr/bin/time -v "$JMETER_HOME/jmeter" -n -t "$jmx_file" -l "$output_jtl" \
+        -JcontractAddress="$contract_address" $account_properties 2> "$resource_metrics_file"
+
+    if [ $? -ne 0 ]; then
+        echo "Erro: JMeter '$round_name' falhou."
+        echo "Detalhes do erro e uso de recurso em $resource_metrics_file"
+    else
+        echo "Round $round_name finalizado. Resultados em $output_jtl"
+        # Anexa o sumário de uso de recursos a uma seção dedicada no relatório final combinado
+        echo -e "\n--- JMeter Round: $round_name Resource Usage ---" >> jmeter_full_report.txt
+        cat "$resource_metrics_file" >> jmeter_full_report.txt
+    fi
+    rm "$resource_metrics_file" # Limpa o arquivo temporário
+}
+
 # --- EXECUÇÃO DOS TESTES JMETER EM SEQUÊNCIA ---
 echo -e "\n--- Iniciando Testes JMeter ---"
+# Inicializa um novo arquivo de relatório combinado.
+echo "--- JMeter Full Test Report ---" > jmeter_full_report.txt
 
-# Executa Round 1: Open
-echo -e "\nPasso 2.1: Executando Round 1: Open..."
-"$JMETER_HOME/jmeter" -n -t "$JMX_OPEN" -l "results_open.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
-echo "Round 1 finalizado. Resultados em results_open.jtl"
+# Arquivo temporário para as métricas de recursos consolidadas de todos os rounds do JMeter.
+JMETER_RESOURCE_SUMMARY_FILE="jmeter_resource_summary_temp.log"
 
-# Executa Round 2: Query
-echo -e "\nPasso 2.2: Executando Round 2: Query..."
-"$JMETER_HOME/jmeter" -n -t "$JMX_QUERY" -l "results_query.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
-echo "Round 2 finalizado. Resultados em results_query.jtl"
+# Exporta as variáveis necessárias para o subshell do bash -c
+export JMETER_HOME
+export JMX_OPEN JMX_QUERY JMX_TRANSFER
+export CONTRACT_ADDRESS ACCOUNT_PROPERTIES
 
-# Executa Round 3: Transfer
-echo -e "\nPasso 2.3: Executando Round 3: Transfer..."
-"$JMETER_HOME/jmeter" -n -t "$JMX_TRANSFER" -l "results_transfer.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
-echo "Round 3 finalizado. Resultados em results_transfer.jtl"
+# Executa todos os rounds do JMeter dentro de um único bloco /usr/bin/time -v.
+# A saída de erro do /usr/bin/time (que contém as métricas de recursos) é redirecionada para JMETER_RESOURCE_SUMMARY_FILE.
+/usr/bin/time -v bash -c '
+    echo "Passo 2.1: Executando Round 1: Open..."
+    "$JMETER_HOME/jmeter" -n -t "$JMX_OPEN" -l "results_open.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
+    # Verifica o status de saída de cada comando JMeter individualmente
+    if [ $? -ne 0 ]; then echo "Erro: JMeter Round 1 (Open) falhou." >&2; exit 1; fi
 
+    echo "Passo 2.2: Executando Round 2: Query..."
+    "$JMETER_HOME/jmeter" -n -t "$JMX_QUERY" -l "results_query.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
+    if [ $? -ne 0 ]; then echo "Erro: JMeter Round 2 (Query) falhou." >&2; exit 1; fi
 
+    echo "Passo 2.3: Executando Round 3: Transfer..."
+    "$JMETER_HOME/jmeter" -n -t "$JMX_TRANSFER" -l "results_transfer.jtl" -JcontractAddress="$CONTRACT_ADDRESS" $ACCOUNT_PROPERTIES
+    if [ $? -ne 0 ]; then echo "Erro: JMeter Round 3 (Transfer) falhou." >&2; exit 1; fi
+' 2> "$JMETER_RESOURCE_SUMMARY_FILE" # Redireciona a saída de erro (métricas do time) do subshell para o arquivo de sumário
+
+# Desexporta as variáveis para limpar o ambiente após a execução do bloco
+unset JMETER_HOME JMX_OPEN JMX_QUERY JMX_TRANSFER CONTRACT_ADDRESS ACCOUNT_PROPERTIES
+
+# Verifica o status de saída de todo o bloco de execução do JMeter
+if [ $? -ne 0 ]; then
+    echo "Erro: Um ou mais rounds do JMeter falharam. Verifique os arquivos .jtl e $JMETER_RESOURCE_SUMMARY_FILE para detalhes."
+    # Anexa o sumário de recursos mesmo em caso de falha para depuração
+    echo -e "\n--- JMeter Consolidated Resource Usage Summary (on error) ---" >> jmeter_full_report.txt
+    cat "$JMETER_RESOURCE_SUMMARY_FILE" >> jmeter_full_report.txt
+else
+    echo -e "\nTodos os rounds do JMeter concluídos."
+fi
+
+# Anexa o sumário de uso de recursos consolidado ao relatório completo
+echo -e "\n--- JMeter Consolidated Resource Usage Summary ---" >> jmeter_full_report.txt
+cat "$JMETER_RESOURCE_SUMMARY_FILE" >> jmeter_full_report.txt
+
+# Limpa o arquivo temporário de métricas de recursos
+rm "$JMETER_RESOURCE_SUMMARY_FILE"
+
+echo -e "\n--- Sumário de todos os testes JMeter (Formato Caliper) ---"
+# Redireciona o sumário formatado para o novo relatório combinado
+echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+" >> jmeter_full_report.txt
+echo "| Name     | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |" >> jmeter_full_report.txt
+echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+" >> jmeter_full_report.txt
+process_jtl_to_caliper_format "results_open.jtl" "Open" >> jmeter_full_report.txt
+process_jtl_to_caliper_format "results_query.jtl" "Query" >> jmeter_full_report.txt
+process_jtl_to_caliper_format "results_transfer.jtl" "Transfer" >> jmeter_full_report.txt
+echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+" >> jmeter_full_report.txt
+
+echo -e "\nTodos os testes do JMeter foram concluídos com sucesso! Veja o relatório completo em jmeter_full_report.txt"
+
+# Mantém a saída para o console também, conforme o script original
 echo -e "\n--- Sumário de todos os testes JMeter (Formato Caliper) ---"
 echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+"
 echo "| Name     | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |"
@@ -235,5 +307,3 @@ process_jtl_to_caliper_format "results_open.jtl" "open"
 process_jtl_to_caliper_format "results_query.jtl" "query"
 process_jtl_to_caliper_format "results_transfer.jtl" "transfer"
 echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+"
-
-echo -e "\nTodos os testes do JMeter foram concluídos com sucesso!"
