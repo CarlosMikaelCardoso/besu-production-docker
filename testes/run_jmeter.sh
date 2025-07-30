@@ -5,224 +5,200 @@ JMETER_VERSION="5.6.3"
 JMETER_DIR="apache-jmeter-${JMETER_VERSION}"
 JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
 CONTRACT_ADDRESS_FILE="contract_address.txt"
-# MODIFICAÇÃO: Corrigida a versão do JAVA_HOME para alinhar com a branch 'smart-contract'.
 export JAVA_HOME=../jdk-21.0.7
+
 # Caminhos para os planos de teste
 JMX_OPEN="test_round1_open.jmx"
 JMX_QUERY="test_round2_query.jmx"
 JMX_TRANSFER="test_round3_transfer.jmx"
 
+# Lista de contentores a serem monitorizados
+DOCKER_CONTAINERS=("node1" "node2" "node3" "node4" "node5" "node6")
+
 # === NOVA CONFIGURAÇÃO PARA EXECUÇÕES MÚLTIPLAS ===
-# Número de repetições. Padrão para 1 se nenhum argumento for fornecido.
 NUM_REPETITIONS=${1:-1}
-# Diretório para logs individuais de cada execução
 TESTE_DIR="$(pwd)"
 JMETER_RUNS_DIR="$TESTE_DIR/jmeter_runs"
-# Arquivo para o sumário consolidado de recursos de todas as execuções
-JMETER_CONSOLIDATED_RESOURCE_SUMMARY_FILE="$TESTE_DIR/jmeter_consolidated_resource_summary.log"
 
 # Limpa o diretório de execuções anteriores e cria um novo
 rm -rf "$JMETER_RUNS_DIR"
 mkdir -p "$JMETER_RUNS_DIR"
 
-# Inicializa arrays para armazenar as métricas de cada execução
-declare -a max_rss_values
-declare -a cpu_percent_values
-declare -a user_time_values
-declare -a sys_time_values
-
-echo "Iniciando a execução do JMeter por $NUM_REPETITIONS vezes."
-echo "Resultados detalhados de cada execução serão salvos em: $JMETER_RUNS_DIR"
-echo "Sumário de recursos consolidado em: $JMETER_CONSOLIDATED_RESOURCE_SUMMARY_FILE"
-
-# Prepara o cabeçalho para o arquivo de sumário de recursos consolidado
-echo "Run,Max_RSS_KB,CPU_Percent,User_Time_Sec,Sys_Time_Sec" > "$JMETER_CONSOLIDATED_RESOURCE_SUMMARY_FILE"
-
-
-# Array para armazenar os resultados formatados de cada round
-declare -a ROUND_RESULTS
-
-# Função para gerar endereços Ethereum e salvá-los em um CSV
+# Função para gerar endereços Ethereum
 generate_eth_accounts_csv() {
     echo "Gerando endereços Ethereum..."
     local temp_dir="temp_eth_gen"
     local accounts_file="ethereum_accounts.csv"
-    local num_accounts=1000 # Defina quantas contas você quer gerar
+    local num_accounts=1000
 
     mkdir -p "$temp_dir"
-    pushd "$temp_dir" > /dev/null # Entra no diretório temporário, silenciando a saída
-
-    # Verifica se o npm está disponível
-    if ! command -v npm &> /dev/null; then
-        echo "Erro: 'npm' não está instalado. Por favor, instale o Node.js e o npm para gerar os endereços."
-        exit 1
-    fi
-
-    # Inicializa projeto Node.js e instala ethers
-    npm init -y > /dev/null 2>&1 # Silencia a saída
-    npm install ethers@^6.0.0 > /dev/null 2>&1 # Instala ethers v6 ou superior, silencia a saída
-
-    if [ $? -ne 0 ]; then
-        echo "Erro: Falha ao instalar 'ethers'. Verifique sua conexão com a internet ou as permissões."
-        popd > /dev/null
-        rm -rf "$temp_dir"
-        exit 1
-    fi
-
-    # Conteúdo do script Node.js para gerar as contas
+    pushd "$temp_dir" > /dev/null
+    if ! command -v npm &> /dev/null; then echo "Erro: 'npm' não está instalado."; exit 1; fi
+    npm init -y > /dev/null 2>&1
+    npm install ethers@^6.0.0 > /dev/null 2>&1
+    if [ $? -ne 0 ]; then echo "Erro: Falha ao instalar 'ethers'."; popd > /dev/null; rm -rf "$temp_dir"; exit 1; fi
     cat <<EOF > generate_accounts.js
 const { Wallet } = require('ethers');
 const fs = require('fs');
-
 const numAccounts = ${num_accounts};
 const outputFileName = '${accounts_file}';
-
-let csvContent = 'accountId\\n'; // Cabeçalho do CSV
-
+let csvContent = 'accountId\\n';
 for (let i = 0; i < numAccounts; i++) {
     const wallet = Wallet.createRandom();
     csvContent += \`\${wallet.address}\\n\`;
 }
-
 fs.writeFileSync(outputFileName, csvContent);
 console.log(\`\${numAccounts} endereços Ethereum gerados e salvos em \${outputFileName}\`);
 EOF
-
     node generate_accounts.js
-    
-    if [ $? -ne 0 ]; then
-        echo "Erro: Falha ao executar o script Node.js para gerar endereços."
-        popd > /dev/null
-        rm -rf "$temp_dir"
-        exit 1
-    fi
-
-    cp "$accounts_file" ../ # Copia para o diretório pai (onde run_jmeter.sh está)
-    popd > /dev/null # Sai do diretório temporário
-    rm -rf "$temp_dir" # Limpa o diretório temporário
+    if [ $? -ne 0 ]; then echo "Erro: Falha ao executar script Node.js."; popd > /dev/null; rm -rf "$temp_dir"; exit 1; fi
+    cp "$accounts_file" ../
+    popd > /dev/null
+    rm -rf "$temp_dir"
     echo "Endereços gerados em ./$accounts_file"
 }
 
-# Função para processar o arquivo .jtl e formatar a saída como o Caliper
-process_jtl_to_caliper_format() {
-    local jtl_file="$1"
-    local round_name="$2"
-    local success_count=0
-    local fail_count=0
-    local min_latency="N/A"
-    local max_latency="N/A"
-    local avg_latency="N/A"
-    local send_rate="N/A"
-    local throughput="N/A"
-
-    if [ -f "$jtl_file" ]; then
-        read -r success_count fail_count min_latency max_latency avg_latency send_rate throughput <<< \
-        $(awk 'BEGIN {
-            FS = ",";
-            min_lat_ms = 999999999;
-            max_lat_ms = 0;
-            total_lat_ms = 0;
-            count_success = 0;
-            count_fail = 0;
-            total_requests = 0;
-            first_ts = 0;
-            last_ts = 0;
+# Função para processar o JTL e retornar dados formatados
+parse_jtl_for_html() {
+    local jtl_file=$1
+    if [ ! -f "$jtl_file" ]; then echo "0 0 N/A N/A N/A N/A N/A"; return; fi
+    
+    awk 'BEGIN { FS=","; min_lat=999999999; max_lat=0; total_lat=0; count_s=0; count_f=0; first_ts=0; last_ts=0; total_req=0; }
+    NR > 1 {
+        ts=$1; el=$2; sc=$8;
+        if(first_ts==0){first_ts=ts}
+        last_ts=ts;
+        total_req++;
+        if(sc=="true"){
+            count_s++;
+            total_lat+=el;
+            if(el<min_lat){min_lat=el}
+            if(el>max_lat){max_lat=el}
+        } else { count_f++ }
+    } END {
+        if(count_s>0){
+            avg_lat_s=sprintf("%.2f", (total_lat/count_s)/1000);
+            min_lat_s=sprintf("%.2f", min_lat/1000);
+            max_lat_s=sprintf("%.2f", max_lat/1000);
+        } else {avg_lat_s="N/A";min_lat_s="N/A";max_lat_s="N/A"}
+        dur_s="N/A";
+        if(first_ts>0 && last_ts>0){ dur_ms=last_ts-first_ts; if(dur_ms>0){dur_s=sprintf("%.2f", dur_ms/1000)}else{dur_s="0.00"} }
+        s_rate="N/A"; tps="N/A";
+        if(dur_s!="N/A" && dur_s > 0){
+            s_rate=sprintf("%.2f", total_req/dur_s);
+            if(count_s>0){tps=sprintf("%.2f", count_s/dur_s)}else{tps="0.00"}
         }
-        NR > 1 {
-            timestamp = $1;
-            elapsed = $2;
-            success = $8;
-
-            if (first_ts == 0) {
-                first_ts = timestamp;
-            }
-            last_ts = timestamp;
-
-            total_requests++;
-
-            if (success == "true") {
-                count_success++;
-                total_lat_ms += elapsed;
-                if (elapsed < min_lat_ms) {
-                    min_lat_ms = elapsed;
-                }
-                if (elapsed > max_lat_ms) {
-                    max_lat_ms = elapsed;
-                }
-            } else {
-                count_fail++;
-            }
-        }
-        END {
-            if (count_success > 0) {
-                avg_lat_ms = total_lat_ms / count_success;
-                min_lat_s = sprintf("%.2f", min_lat_ms / 1000);
-                max_lat_s = sprintf("%.2f", max_lat_ms / 1000);
-                avg_lat_s = sprintf("%.2f", avg_lat_ms / 1000);
-            } else {
-                min_lat_s = "N/A";
-                max_lat_s = "N/A";
-                avg_lat_s = "N/A";
-            }
-
-            duration_s = "N/A";
-            if (first_ts != 0 && last_ts != 0) {
-                duration_ms = last_ts - first_ts;
-                if (duration_ms > 0) {
-                    duration_s = sprintf("%.2f", duration_ms / 1000);
-                } else {
-                    duration_s = "0.00";
-                }
-            }
-            
-            send_rate = "N/A";
-            throughput = "N/A";
-
-            if (duration_s != "N/A" && duration_s > 0) {
-                send_rate = sprintf("%.2f", total_requests / duration_s);
-                if (count_success > 0) {
-                    throughput = sprintf("%.2f", count_success / duration_s);
-                } else {
-                    throughput = "0.00";
-                }
-            }
-
-
-            printf "%d %d %s %s %s %s %s\n", count_success, count_fail, min_lat_s, max_lat_s, avg_lat_s, send_rate, throughput;
-        }' "$jtl_file")
-    fi
-        
-    printf "| %-8s | %-4s | %-4s | %-15s | %-15s | %-15s | %-15s | %-16s |\n" \
-    "$round_name" "$success_count" "$fail_count" "$send_rate" "$max_latency" "$min_latency" "$avg_latency" "$throughput"
+        printf "%d %d %s %s %s %s %s", count_s, count_f, s_rate, max_lat_s, min_lat_s, avg_lat_s, tps;
+    }' "$jtl_file"
 }
+
+# --- FUNÇÃO PARA GERAR O RELATÓRIO HTML ---
+generate_html_report() {
+    local run_dir=$1
+    local report_file="$run_dir/jmeter_docker_report.html"
+    local rounds=("Open" "Query" "Transfer")
+
+    # Inicia o ficheiro HTML com o cabeçalho e estilos
+    cat > "$report_file" <<EOF
+<!doctype html>
+<html>
+<head>
+    <title>JMeter & Docker Report</title>
+    <meta charset="UTF-8"/>
+    <style type="text/css">
+        body { font-family: IBM Plex Sans; font-weight: 200; }
+        .left-column { position: fixed; width:20%; }
+        .left-column ul { display: block; padding: 0; list-style: none; border-bottom: 1px solid #d9d9d9; font-size: 14px; }
+        .left-column h2 { font-size: 24px; font-weight: 400; margin-block-end: 0.5em; }
+        .left-column h3 { font-size: 18px; font-weight: 400; margin-block-end: 0.5em; }
+        .left-column li { margin-left: 10px; margin-bottom: 5px; color: #5e6b73; }
+        .right-column { margin-left: 22%; width:60%; }
+        .right-column table { font-size:11px; color:#333333; border-width: 1px; border-color: #666666; border-collapse: collapse; margin-bottom: 10px; }
+        .right-column h2, .right-column h3, .right-column h4 { font-weight: 400; }
+        .right-column h4 { margin-block-end: 0; }
+        .right-column th { border-width: 1px; font-size: small; padding: 8px; border-style: solid; border-color: #666666; background-color: #f2f2f2; }
+        .right-column td { border-width: 1px; font-size: small; padding: 8px; border-style: solid; border-color: #666666; background-color: #ffffff; font-weight: 400; }
+        .tag { margin-bottom: 10px; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="left-column">
+            <img src="https://hyperledger.github.io/caliper/assets/img/hyperledger_caliper_logo_color.png" style="width:95%;" alt="">
+            <ul>
+                <h3>&nbspBasic information</h3>
+                <li>Tool: &nbsp<span style="font-weight: 500;">JMeter & Docker</span></li>
+                <li>Benchmark Rounds: &nbsp<span style="font-weight: 500;">3</span></li>
+            </ul>
+            <ul>
+                <h3>&nbspBenchmark results</h3>
+                <li><a href="#benchmarksummary">Summary</a></li>
+EOF
+    for round_name in "${rounds[@]}"; do
+        echo "<li><a href=\"#${round_name,,}\">${round_name}</a></li>" >> "$report_file"
+    done
+    echo "</ul></div><div class=\"right-column\"><h1 style=\"padding-top: 3em; font-weight: 500;\">JMeter Report</h1>" >> "$report_file"
+    
+    # Tabela de Sumário de Performance
+    echo "<div style=\"border-bottom: 1px solid #d9d9d9; margin-bottom: 10px;\" id=\"benchmarksummary\"><h3>Summary of performance metrics</h3><table style=\"min-width: 100%;\"><tr><th>Name</th><th>Succ</th><th>Fail</th><th>Send Rate (TPS)</th><th>Max Latency (s)</th><th>Min Latency (s)</th><th>Avg Latency (s)</th><th>Throughput (TPS)</th></tr>" >> "$report_file"
+    for round_name in "${rounds[@]}"; do
+        jtl_file="$run_dir/results_${round_name,,}.jtl"
+        perf_data=($(parse_jtl_for_html "$jtl_file"))
+        echo "<tr><td>${round_name}</td><td>${perf_data[0]}</td><td>${perf_data[1]}</td><td>${perf_data[2]}</td><td>${perf_data[3]}</td><td>${perf_data[4]}</td><td>${perf_data[5]}</td><td>${perf_data[6]}</td></tr>" >> "$report_file"
+    done
+    echo "</table></div>" >> "$report_file"
+
+    # Secções detalhadas para cada Round
+    for round_name in "${rounds[@]}"; do
+        jtl_file="$run_dir/results_${round_name,,}.jtl"
+        docker_stats_log="$run_dir/docker_stats_${round_name,,}.log"
+        perf_data=($(parse_jtl_for_html "$jtl_file"))
+
+        echo "<div style=\"border-bottom: 1px solid #d9d9d9; padding-bottom: 10px;\" id=\"${round_name,,}\"><h2>Benchmark round: ${round_name}</h2><h3>Performance metrics for ${round_name}</h3><table style=\"min-width: 100%;\"><tr><th>Name</th><th>Succ</th><th>Fail</th><th>Send Rate (TPS)</th><th>Max Latency (s)</th><th>Min Latency (s)</th><th>Avg Latency (s)</th><th>Throughput (TPS)</th></tr><tr><td>${round_name}</td><td>${perf_data[0]}</td><td>${perf_data[1]}</td><td>${perf_data[2]}</td><td>${perf_data[3]}</td><td>${perf_data[4]}</td><td>${perf_data[5]}</td><td>${perf_data[6]}</td></tr></table>" >> "$report_file"
+        echo "<h3>Resource utilization for ${round_name}</h3><h4>Resource monitor: docker</h4><table style=\"min-width: 100%;\"><tr><th>Name</th><th>CPU%(max)</th><th>CPU%(avg)</th><th>Memory(max) [MB]</th><th>Memory(avg) [MB]</th></tr>" >> "$report_file"
+        
+        for container in "${DOCKER_CONTAINERS[@]}"; do
+            if [ ! -f "$docker_stats_log" ]; then continue; fi
+            CPU_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $2}' | sed 's/%//')
+            MEM_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $3}' | sed -e 's/MiB.*//' -e 's/GiB.*/ \* 1024/' | bc)
+            
+            if [ -n "$CPU_DATA" ]; then
+                MAX_CPU=$(echo "$CPU_DATA" | sort -nr | head -n 1)
+                AVG_CPU=$(echo "$CPU_DATA" | awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                MAX_MEM=$(echo "$MEM_DATA" | sort -nr | head -n 1)
+                AVG_MEM=$(echo "$MEM_DATA" | awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                
+                LC_NUMERIC=C echo "<tr><td>/${container}</td><td>${MAX_CPU}</td><td>${AVG_CPU}</td><td>${MAX_MEM}</td><td>${AVG_MEM}</td></tr>" >> "$report_file"
+            fi
+        done
+        echo "</table></div>" >> "$report_file"
+    done
+
+    # Fecha o ficheiro HTML
+    echo "</div></main></body></html>" >> "$report_file"
+    echo -e "\nRelatório HTML gerado em: $report_file"
+}
+
 
 # --- INSTALAÇÃO AUTOMÁTICA DO JMETER ---
 if [ ! -d "$JMETER_DIR" ]; then
-    echo "Diretório do JMeter não encontrado. Baixando e instalando o JMeter ${JMETER_VERSION}..."
-    if ! command -v wget &> /dev/null; then
-        echo "Erro: 'wget' não está instalado. Por favor, instale-o para continuar."
-        exit 1
-    fi
+    echo "Baixando e instalando o JMeter ${JMETER_VERSION}..."
+    if ! command -v wget &> /dev/null; then echo "Erro: 'wget' não está instalado."; exit 1; fi
     wget -q --show-progress "$JMETER_URL"
     tar -xzf "apache-jmeter-${JMETER_VERSION}.tgz"
     rm "apache-jmeter-${JMETER_VERSION}.tgz"
-    echo "JMeter instalado com sucesso em ./${JMETER_DIR}/"
 else
     echo "JMeter já está instalado."
 fi
 export JMETER_HOME="$(pwd)/${JMETER_DIR}/bin"
 
 
-# --- VERIFICAÇÃO DO ENDEREÇO DO CONTRATO ---
-echo "Passo 1: Lendo o endereço do contrato..."
+# --- LÓGICA PRINCIPAL ---
 if [ ! -s "$CONTRACT_ADDRESS_FILE" ]; then
     echo "Erro: Arquivo '$CONTRACT_ADDRESS_FILE' não encontrado ou vazio. Execute 'run_caliper.sh' primeiro."
     exit 1
 fi
 CONTRACT_ADDRESS=$(<"$CONTRACT_ADDRESS_FILE")
-echo "Endereço do contrato a ser utilizado: $CONTRACT_ADDRESS"
-
-# --- GERAR NOVAS CONTAS ETHEREUM ---
 generate_eth_accounts_csv
 ACCOUNT_CSV_FILE="$(pwd)/ethereum_accounts.csv"
 
@@ -230,91 +206,45 @@ ACCOUNT_CSV_FILE="$(pwd)/ethereum_accounts.csv"
 # --- EXECUÇÃO EM LOOP ---
 for (( i=1; i<=$NUM_REPETITIONS; i++ ))
 do
-    echo -e "\n--- Execução do JMeter #$i de $NUM_REPETITIONS ---"
-
+    echo -e "\n--- Iniciando Execução JMeter #$i de $NUM_REPETITIONS ---"
     CURRENT_JMETER_RUN_DIR="$JMETER_RUNS_DIR/run_$i"
     mkdir -p "$CURRENT_JMETER_RUN_DIR"
-    CURRENT_JMETER_RESOURCE_METRICS_FILE="$CURRENT_JMETER_RUN_DIR/jmeter_resource_metrics.txt"
-    
-    # Exporta as variáveis de ambiente necessárias para o subshell
-    export JMX_OPEN
-    export JMX_QUERY
-    export JMX_TRANSFER
-    export CONTRACT_ADDRESS
-    export ACCOUNT_CSV_FILE
-    export CURRENT_JMETER_RUN_DIR
 
-    # Executa todos os rounds do JMeter dentro de um único bloco /usr/bin/time -v para cada repetição.
-    /usr/bin/time -v bash -c '
-        echo "Passo 2.1: Executando Round 1: Open..."
-        "$JMETER_HOME/jmeter" -n -t "$JMX_OPEN" -l "$CURRENT_JMETER_RUN_DIR/results_open.jtl" -JcontractAddress="$CONTRACT_ADDRESS" -JaccountCsvPath="$ACCOUNT_CSV_FILE"
-        if [ $? -ne 0 ]; then echo "Erro: JMeter Round 1 (Open) falhou." >&2; exit 1; fi
+    # Função para executar um round e monitorizá-lo
+    run_test_and_monitor() {
+        local JMX_FILE=$1
+        local ROUND_NAME=$2
+        local JTL_FILE="$CURRENT_JMETER_RUN_DIR/results_${ROUND_NAME,,}.jtl"
+        local DOCKER_STATS_LOG="$CURRENT_JMETER_RUN_DIR/docker_stats_${ROUND_NAME,,}.log"
 
-        echo "Passo 2.2: Executando Round 2: Query..."
-        "$JMETER_HOME/jmeter" -n -t "$JMX_QUERY" -l "$CURRENT_JMETER_RUN_DIR/results_query.jtl" -JcontractAddress="$CONTRACT_ADDRESS" -JaccountCsvPath="$ACCOUNT_CSV_FILE"
-        if [ $? -ne 0 ]; then echo "Erro: JMeter Round 2 (Query) falhou." >&2; exit 1; fi
+        echo -e "\n--- Executando Round: $ROUND_NAME ---"
+        rm -f "$DOCKER_STATS_LOG"
+        touch "$DOCKER_STATS_LOG"
 
-        echo "Passo 2.3: Executando Round 3: Transfer..."
-        "$JMETER_HOME/jmeter" -n -t "$JMX_TRANSFER" -l "$CURRENT_JMETER_RUN_DIR/results_transfer.jtl" -JcontractAddress="$CONTRACT_ADDRESS" -JaccountCsvPath="$ACCOUNT_CSV_FILE"
-        if [ $? -ne 0 ]; then echo "Erro: JMeter Round 3 (Transfer) falhou." >&2; exit 1; fi
-    ' > "$CURRENT_JMETER_RUN_DIR/jmeter_log.txt" 2> "$CURRENT_JMETER_RESOURCE_METRICS_FILE"
-
-    JMETER_EXIT_STATUS=$?
-    
-    # MODIFICAÇÃO: A linha "unset" foi removida para que as variáveis persistam entre as execuções do loop.
-    
-    if [ "$JMETER_EXIT_STATUS" -ne 0 ]; then
-        echo "Erro: A execução do JMeter #$i falhou. Verifique os logs em $CURRENT_JMETER_RUN_DIR para detalhes."
-    else
-        echo "Execução do JMeter #$i finalizada. Resultados salvos em $CURRENT_JMETER_RUN_DIR."
-
-        # Extrai as métricas específicas do output do time -v
-        max_rss=$(grep "Maximum resident set size (kbytes):" "$CURRENT_JMETER_RESOURCE_METRICS_FILE" | awk '{print $NF}')
-        cpu_percent=$(grep "Percent of CPU this job got:" "$CURRENT_JMETER_RESOURCE_METRICS_FILE" | awk '{print $NF}' | sed 's/%.*//')
-        user_time=$(grep "User time (seconds):" "$CURRENT_JMETER_RESOURCE_METRICS_FILE" | awk '{print $NF}')
-        sys_time=$(grep "System time (seconds):" "$CURRENT_JMETER_RESOURCE_METRICS_FILE" | awk '{print $NF}')
-
-        # Armazena as métricas em arrays
-        max_rss_values+=("$max_rss")
-        cpu_percent_values+=("$cpu_percent")
-        user_time_values+=("$user_time")
-        sys_time_values+=("$sys_time")
-
-        # Anexa as métricas ao arquivo de sumário de recursos consolidado
-        echo "$i,$max_rss,$cpu_percent,$user_time,$sys_time" >> "$JMETER_CONSOLIDATED_RESOURCE_SUMMARY_FILE"
+        # Inicia o monitoramento
+        MONITOR_PID=
+        (
+            while true; do
+                docker stats --no-stream --format "{{.Name}},{{.CPUPerc}},{{.MemUsage}}" "${DOCKER_CONTAINERS[@]}" >> "$DOCKER_STATS_LOG"
+                sleep 1
+            done
+        ) & MONITOR_PID=$!
         
-        # Gera o sumário para a execução atual
-        echo -e "\n--- Sumário da Execução #$i (Formato Caliper) ---"
-        echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+"
-        echo "| Name     | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |"
-        echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+"
-        process_jtl_to_caliper_format "$CURRENT_JMETER_RUN_DIR/results_open.jtl" "Open"
-        process_jtl_to_caliper_format "$CURRENT_JMETER_RUN_DIR/results_query.jtl" "Query"
-        process_jtl_to_caliper_format "$CURRENT_JMETER_RUN_DIR/results_transfer.jtl" "Transfer"
-        echo "+----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+"
-    fi
+        # Executa o teste JMeter
+        "$JMETER_HOME/jmeter" -n -t "$JMX_FILE" -l "$JTL_FILE" -JcontractAddress="$CONTRACT_ADDRESS" -JaccountCsvPath="$ACCOUNT_CSV_FILE"
+        
+        # Para o monitoramento
+        kill "$MONITOR_PID"
+    }
+
+    # Executa cada round separadamente
+    run_test_and_monitor "$JMX_OPEN" "Open"
+    run_test_and_monitor "$JMX_QUERY" "Query"
+    run_test_and_monitor "$JMX_TRANSFER" "Transfer"
+
+    # Gera o relatório HTML no final da execução
+    generate_html_report "$CURRENT_JMETER_RUN_DIR"
+
 done
-
-
-# --- SUMÁRIO CONSOLIDADO DE USO DE RECURSOS ---
-echo -e "\n--- Sumário Consolidado de Uso de Recursos do JMeter (todas as execuções) ---"
-if [ ${#max_rss_values[@]} -eq 0 ]; then
-    echo "Nenhum dado de recurso coletado para consolidação."
-else
-    # Calcula as médias das métricas coletadas
-    avg_max_rss=$(awk 'BEGIN {sum=0; count=0} {sum+=$1; count++} END {if (count > 0) printf "%.2f", sum/count; else print "N/A"}' <(printf "%s\n" "${max_rss_values[@]}"))
-    avg_cpu_percent=$(awk 'BEGIN {sum=0; count=0} {sum+=$1; count++} END {if (count > 0) printf "%.2f", sum/count; else print "N/A"}' <(printf "%s\n" "${cpu_percent_values[@]}"))
-    avg_user_time=$(awk 'BEGIN {sum=0; count=0} {sum+=$1; count++} END {if (count > 0) printf "%.2f", sum/count; else print "N/A"}' <(printf "%s\n" "${user_time_values[@]}"))
-    avg_sys_time=$(awk 'BEGIN {sum=0; count=0} {sum+=$1; count++} END {if (count > 0) printf "%.2f", sum/count; else print "N/A"}' <(printf "%s\n" "${sys_time_values[@]}"))
-
-    echo "Média Max RSS: ${avg_max_rss} KB"
-    echo "Média %CPU: ${avg_cpu_percent}%"
-    echo "Média Tempo de Usuário: ${avg_user_time} segundos"
-    echo "Média Tempo de Sistema: ${avg_sys_time} segundos"
-fi
-
-echo -e "\nDetalhes de cada execução e sumário consolidado de recursos salvos em:"
-echo "- Logs por execução: $JMETER_RUNS_DIR/"
-echo "- Sumário de recursos consolidado: $JMETER_CONSOLIDATED_RESOURCE_SUMMARY_FILE"
 
 echo -e "\nExecução do JMeter concluída!"

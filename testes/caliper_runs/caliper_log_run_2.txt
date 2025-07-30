@@ -1,0 +1,294 @@
+2025.07.30-20:16:53.180[32m info [39m [caliper] [cli-launch-manager] 	Set workspace path: /home/gercom/rede_recurso/caliper-benchmarks
+2025.07.30-20:16:53.183[32m info [39m [caliper] [cli-launch-manager] 	Set benchmark configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/simple/config.yaml
+2025.07.30-20:16:53.183[32m info [39m [caliper] [cli-launch-manager] 	Set network configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/../meu-contrato/networkconfig.json
+2025.07.30-20:16:53.183[32m info [39m [caliper] [cli-launch-manager] 	Set SUT type: ethereum
+2025.07.30-20:16:54.094[32m info [39m [caliper] [benchmark-validator] 	No observer specified, will default to `none`
+2025.07.30-20:16:54.095[32m info [39m [caliper] [caliper-engine] 	Starting benchmark flow
+2025.07.30-20:16:54.096[32m info [39m [caliper] [caliper-engine] 	Network configuration attribute "caliper.command.start" is not present, skipping start command
+2025.07.30-20:16:54.173[32m info [39m [caliper] [caliper-engine] 	Executed "init" step in 0.023 seconds
+2025.07.30-20:16:54.174[32m info [39m [caliper] [ethereum-connector] 	Creating contracts...
+2025.07.30-20:16:55.048[32m info [39m [caliper] [ethereum-connector] 	Deployed contract simple at 0xC4123830737dE034684Bc61611055668263Db912
+2025.07.30-20:16:55.050[32m info [39m [caliper] [caliper-engine] 	Executed "install" step in 0.876 seconds
+2025.07.30-20:16:55.056[32m info [39m [caliper] [monitor.js] 	Attempting to create resource monitor of type docker
+2025.07.30-20:16:55.059[32m info [39m [caliper] [default-observer] 	Observer interval set to 5000 milliseconds
+2025.07.30-20:16:55.068[32m info [39m [caliper] [round-orchestrator] 	Preparing worker connections
+2025.07.30-20:16:55.069[32m info [39m [caliper] [worker-orchestrator] 	Launching worker 1 of 5
+2025.07.30-20:16:55.081[32m info [39m [caliper] [worker-orchestrator] 	Launching worker 2 of 5
+2025.07.30-20:16:55.086[32m info [39m [caliper] [worker-orchestrator] 	Launching worker 3 of 5
+2025.07.30-20:16:55.089[32m info [39m [caliper] [worker-orchestrator] 	Launching worker 4 of 5
+2025.07.30-20:16:55.093[32m info [39m [caliper] [worker-orchestrator] 	Launching worker 5 of 5
+2025.07.30-20:16:55.098[32m info [39m [caliper] [worker-orchestrator] 	Messenger not configured, entering configure phase...
+2025.07.30-20:16:55.100[32m info [39m [caliper] [worker-orchestrator] 	No existing workers detected, entering worker launch phase...
+2025.07.30-20:16:55.101[32m info [39m [caliper] [worker-orchestrator] 	Waiting for 5 workers to be connected...
+2025.07.30-20:16:56.019[32m info [39m [caliper] [cli-launch-worker] 	Set workspace path: /home/gercom/rede_recurso/caliper-benchmarks
+2025.07.30-20:16:56.022[32m info [39m [caliper] [cli-launch-worker] 	Set benchmark configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/simple/config.yaml
+2025.07.30-20:16:56.022[32m info [39m [caliper] [cli-launch-worker] 	Set network configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/../meu-contrato/networkconfig.json
+2025.07.30-20:16:56.023[32m info [39m [caliper] [cli-launch-worker] 	Set SUT type: ethereum
+2025.07.30-20:16:56.040[32m info [39m [caliper] [cli-launch-worker] 	Set workspace path: /home/gercom/rede_recurso/caliper-benchmarks
+2025.07.30-20:16:56.043[32m info [39m [caliper] [cli-launch-worker] 	Set benchmark configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/simple/config.yaml
+2025.07.30-20:16:56.043[32m info [39m [caliper] [cli-launch-worker] 	Set network configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/../meu-contrato/networkconfig.json
+2025.07.30-20:16:56.044[32m info [39m [caliper] [cli-launch-worker] 	Set SUT type: ethereum
+2025.07.30-20:16:56.043[32m info [39m [caliper] [cli-launch-worker] 	Set workspace path: /home/gercom/rede_recurso/caliper-benchmarks
+2025.07.30-20:16:56.046[32m info [39m [caliper] [cli-launch-worker] 	Set benchmark configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/simple/config.yaml
+2025.07.30-20:16:56.047[32m info [39m [caliper] [cli-launch-worker] 	Set network configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/../meu-contrato/networkconfig.json
+2025.07.30-20:16:56.047[32m info [39m [caliper] [cli-launch-worker] 	Set SUT type: ethereum
+2025.07.30-20:16:56.061[32m info [39m [caliper] [cli-launch-worker] 	Set workspace path: /home/gercom/rede_recurso/caliper-benchmarks
+2025.07.30-20:16:56.064[32m info [39m [caliper] [cli-launch-worker] 	Set benchmark configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/simple/config.yaml
+2025.07.30-20:16:56.064[32m info [39m [caliper] [cli-launch-worker] 	Set network configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/../meu-contrato/networkconfig.json
+2025.07.30-20:16:56.064[32m info [39m [caliper] [cli-launch-worker] 	Set SUT type: ethereum
+2025.07.30-20:16:56.104[32m info [39m [caliper] [cli-launch-worker] 	Set workspace path: /home/gercom/rede_recurso/caliper-benchmarks
+2025.07.30-20:16:56.107[32m info [39m [caliper] [cli-launch-worker] 	Set benchmark configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/simple/config.yaml
+2025.07.30-20:16:56.107[32m info [39m [caliper] [cli-launch-worker] 	Set network configuration path: /home/gercom/rede_recurso/besu-production-docker/testes/../meu-contrato/networkconfig.json
+2025.07.30-20:16:56.107[32m info [39m [caliper] [cli-launch-worker] 	Set SUT type: ethereum
+2025.07.30-20:16:57.323[32m info [39m [caliper] [worker-orchestrator] 	5 workers connected, progressing to worker assignment phase.
+2025.07.30-20:16:57.326[32m info [39m [caliper] [worker-orchestrator] 	Workers currently unassigned, awaiting index assignment...
+2025.07.30-20:16:57.331[32m info [39m [caliper] [worker-orchestrator] 	Waiting for 5 workers to be assigned...
+2025.07.30-20:16:57.840[32m info [39m [caliper] [worker-orchestrator] 	5 workers assigned, progressing to worker initialization phase.
+2025.07.30-20:16:57.840[32m info [39m [caliper] [worker-orchestrator] 	Waiting for 5 workers to be ready...
+2025.07.30-20:16:57.842[32m info [39m [caliper] [worker-message-handler] 	Initializing Worker#1...
+2025.07.30-20:16:57.842[32m info [39m [caliper] [worker-message-handler] 	Initializing Worker#0...
+2025.07.30-20:16:57.842[32m info [39m [caliper] [worker-message-handler] 	Initializing Worker#4...
+2025.07.30-20:16:57.842[32m info [39m [caliper] [worker-message-handler] 	Initializing Worker#2...
+2025.07.30-20:16:57.842[32m info [39m [caliper] [worker-message-handler] 	Initializing Worker#3...
+2025.07.30-20:16:57.876[32m info [39m [caliper] [worker-message-handler] 	Worker#0 initialized
+2025.07.30-20:16:57.877[32m info [39m [caliper] [worker-message-handler] 	Worker#4 initialized
+2025.07.30-20:16:57.879[32m info [39m [caliper] [worker-message-handler] 	Worker#2 initialized
+2025.07.30-20:16:57.879[32m info [39m [caliper] [worker-message-handler] 	Worker#3 initialized
+2025.07.30-20:16:57.880[32m info [39m [caliper] [worker-message-handler] 	Worker#1 initialized
+2025.07.30-20:16:57.884[32m info [39m [caliper] [worker-orchestrator] 	5 workers ready, progressing to test preparation phase.
+2025.07.30-20:16:57.884[32m info [39m [caliper] [round-orchestrator] 	Started round 1 (open)
+2025.07.30-20:16:57.893[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#0
+2025.07.30-20:16:57.895[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#4 for Round#0
+2025.07.30-20:16:57.896[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#2 for Round#0
+2025.07.30-20:16:57.897[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#0
+2025.07.30-20:16:57.899[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#3 for Round#0
+2025.07.30-20:16:58.025[32m info [39m [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 0 is starting...
+2025.07.30-20:16:58.025[32m info [39m [caliper] [caliper-worker] 	Info: worker 4 prepare test phase for round 0 is starting...
+2025.07.30-20:16:58.028[32m info [39m [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 0 is completed
+2025.07.30-20:16:58.029[32m info [39m [caliper] [worker-message-handler] 	Worker#1 prepared for Round#0
+2025.07.30-20:16:58.031[32m info [39m [caliper] [caliper-worker] 	Info: worker 2 prepare test phase for round 0 is starting...
+2025.07.30-20:16:58.032[32m info [39m [caliper] [caliper-worker] 	Info: worker 4 prepare test phase for round 0 is completed
+2025.07.30-20:16:58.033[32m info [39m [caliper] [worker-message-handler] 	Worker#4 prepared for Round#0
+2025.07.30-20:16:58.035[32m info [39m [caliper] [caliper-worker] 	Info: worker 2 prepare test phase for round 0 is completed
+2025.07.30-20:16:58.035[32m info [39m [caliper] [worker-message-handler] 	Worker#2 prepared for Round#0
+2025.07.30-20:16:58.044[32m info [39m [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 0 is starting...
+2025.07.30-20:16:58.047[32m info [39m [caliper] [caliper-worker] 	Info: worker 3 prepare test phase for round 0 is starting...
+2025.07.30-20:16:58.051[32m info [39m [caliper] [caliper-worker] 	Info: worker 3 prepare test phase for round 0 is completed
+2025.07.30-20:16:58.051[32m info [39m [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 0 is completed
+2025.07.30-20:16:58.051[32m info [39m [caliper] [worker-message-handler] 	Worker#3 prepared for Round#0
+2025.07.30-20:16:58.051[32m info [39m [caliper] [worker-message-handler] 	Worker#0 prepared for Round#0
+2025.07.30-20:16:58.053[32m info [39m [caliper] [worker-orchestrator] 	5 workers prepared, progressing to test phase.
+2025.07.30-20:17:00.113[32m info [39m [caliper] [round-orchestrator] 	Monitors successfully started
+2025.07.30-20:17:00.116[32m info [39m [caliper] [worker-message-handler] 	Worker#0 is starting Round#0
+2025.07.30-20:17:00.116[32m info [39m [caliper] [worker-message-handler] 	Worker#1 is starting Round#0
+2025.07.30-20:17:00.117[32m info [39m [caliper] [worker-message-handler] 	Worker#2 is starting Round#0
+2025.07.30-20:17:00.118[32m info [39m [caliper] [worker-message-handler] 	Worker#3 is starting Round#0
+2025.07.30-20:17:00.120[32m info [39m [caliper] [worker-message-handler] 	Worker#4 is starting Round#0
+2025.07.30-20:17:00.204[32m info [39m [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2025.07.30-20:17:00.205[32m info [39m [caliper] [caliper-worker] 	Worker #2 starting workload loop
+2025.07.30-20:17:00.221[32m info [39m [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2025.07.30-20:17:00.226[32m info [39m [caliper] [caliper-worker] 	Worker #4 starting workload loop
+2025.07.30-20:17:00.226[32m info [39m [caliper] [caliper-worker] 	Worker #3 starting workload loop
+2025.07.30-20:17:03.073[32m info [39m [caliper] [default-observer] 	[open Round 0 Transaction Info] - Submitted: 104 Succ: 0 Fail:0 Unfinished:104
+2025.07.30-20:17:08.057[32m info [39m [caliper] [default-observer] 	[open Round 0 Transaction Info] - Submitted: 355 Succ: 233 Fail:0 Unfinished:122
+2025.07.30-20:17:13.059[32m info [39m [caliper] [default-observer] 	[open Round 0 Transaction Info] - Submitted: 605 Succ: 490 Fail:0 Unfinished:115
+2025.07.30-20:17:18.059[32m info [39m [caliper] [default-observer] 	[open Round 0 Transaction Info] - Submitted: 855 Succ: 740 Fail:0 Unfinished:115
+2025.07.30-20:17:23.061[32m info [39m [caliper] [default-observer] 	[open Round 0 Transaction Info] - Submitted: 1000 Succ: 989 Fail:0 Unfinished:11
+2025.07.30-20:17:26.124[32m info [39m [caliper] [worker-message-handler] 	Worker#0 finished Round#0
+2025.07.30-20:17:26.125[32m info [39m [caliper] [worker-message-handler] 	Worker#2 finished Round#0
+2025.07.30-20:17:26.136[32m info [39m [caliper] [worker-message-handler] 	Worker#1 finished Round#0
+2025.07.30-20:17:26.141[32m info [39m [caliper] [worker-message-handler] 	Worker#4 finished Round#0
+2025.07.30-20:17:26.142[32m info [39m [caliper] [worker-message-handler] 	Worker#3 finished Round#0
+2025.07.30-20:17:31.148[32m info [39m [caliper] [default-observer] 	Resetting txCount indicator count
+2025.07.30-20:17:31.151[32m info [39m [caliper] [report-builder] 	### Test result ###
+2025.07.30-20:17:31.165[32m info [39m [caliper] [report-builder] 	
++------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| open | 1000 | 0    | 50.2            | 6.46            | 1.15            | 3.99            | 40.2             |
++------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2025.07.30-20:17:31.173[32m info [39m [caliper] [report-builder] 	### docker resource stats ###'
+2025.07.30-20:17:31.179[32m info [39m [caliper] [report-builder] 	
++--------+-----------+-----------+------------------+------------------+----------------+-----------------+-----------------+----------------+
+| Name   | CPU%(max) | CPU%(avg) | Memory(max) [MB] | Memory(avg) [MB] | Traffic In [B] | Traffic Out [B] | Disc Write [MB] | Disc Read [KB] |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|----------------|
+| /node3 | 1.965     | 0.74      | 542              | 536              | 0.00           | 0.00            | 0.934           | 8.00           |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|----------------|
+| /node5 | 2.0875    | 0.8625    | 509              | 504              | 0.00           | 0.00            | 1.38            | 0.00           |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|----------------|
+| /node1 | 2.0225    | 0.96875   | 484              | 482              | 0.00           | 0.00            | 1.25            | 0.00           |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|----------------|
+| /node4 | 2.08625   | 0.79875   | 533              | 531              | 0.00           | 0.00            | 1.63            | 0.00           |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|----------------|
+| /node6 | 1.8225    | 0.66875   | 515              | 509              | 0.00           | 0.00            | 1.15            | 0.00           |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|----------------|
+| /node2 | 2.975     | 1.21375   | 707              | 706              | 0.00           | 0.00            | 1.45            | 64.0           |
++--------+-----------+-----------+------------------+------------------+----------------+-----------------+-----------------+----------------+
+
+2025.07.30-20:17:31.180[32m info [39m [caliper] [round-orchestrator] 	Finished round 1 (open) in 24.938 seconds
+2025.07.30-20:17:31.180[32m info [39m [caliper] [monitor.js] 	Stopping all monitors
+2025.07.30-20:17:31.281[32m info [39m [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2025.07.30-20:17:36.287[32m info [39m [caliper] [round-orchestrator] 	Started round 2 (query)
+2025.07.30-20:17:36.289[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#1
+2025.07.30-20:17:36.290[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#1
+2025.07.30-20:17:36.291[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#2 for Round#1
+2025.07.30-20:17:36.293[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#3 for Round#1
+2025.07.30-20:17:36.295[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#4 for Round#1
+2025.07.30-20:17:36.385[32m info [39m [caliper] [caliper-worker] 	Info: worker 3 prepare test phase for round 1 is starting...
+2025.07.30-20:17:36.386[32m info [39m [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 1 is starting...
+2025.07.30-20:17:36.386[32m info [39m [caliper] [caliper-worker] 	Info: worker 4 prepare test phase for round 1 is starting...
+2025.07.30-20:17:36.386[32m info [39m [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 1 is starting...
+2025.07.30-20:17:36.387[32m info [39m [caliper] [caliper-worker] 	Info: worker 3 prepare test phase for round 1 is completed
+2025.07.30-20:17:36.387[32m info [39m [caliper] [worker-message-handler] 	Worker#3 prepared for Round#1
+2025.07.30-20:17:36.388[32m info [39m [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 1 is completed
+2025.07.30-20:17:36.388[32m info [39m [caliper] [worker-message-handler] 	Worker#1 prepared for Round#1
+2025.07.30-20:17:36.388[32m info [39m [caliper] [caliper-worker] 	Info: worker 4 prepare test phase for round 1 is completed
+2025.07.30-20:17:36.388[32m info [39m [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 1 is completed
+2025.07.30-20:17:36.389[32m info [39m [caliper] [worker-message-handler] 	Worker#4 prepared for Round#1
+2025.07.30-20:17:36.389[32m info [39m [caliper] [worker-message-handler] 	Worker#0 prepared for Round#1
+2025.07.30-20:17:36.389[32m info [39m [caliper] [caliper-worker] 	Info: worker 2 prepare test phase for round 1 is starting...
+2025.07.30-20:17:36.391[32m info [39m [caliper] [caliper-worker] 	Info: worker 2 prepare test phase for round 1 is completed
+2025.07.30-20:17:36.392[32m info [39m [caliper] [worker-message-handler] 	Worker#2 prepared for Round#1
+2025.07.30-20:17:36.393[32m info [39m [caliper] [worker-orchestrator] 	5 workers prepared, progressing to test phase.
+2025.07.30-20:17:38.441[32m info [39m [caliper] [round-orchestrator] 	Monitors successfully started
+2025.07.30-20:17:38.443[32m info [39m [caliper] [worker-message-handler] 	Worker#0 is starting Round#1
+2025.07.30-20:17:38.444[32m info [39m [caliper] [worker-message-handler] 	Worker#1 is starting Round#1
+2025.07.30-20:17:38.446[32m info [39m [caliper] [worker-message-handler] 	Worker#2 is starting Round#1
+2025.07.30-20:17:38.447[32m info [39m [caliper] [worker-message-handler] 	Worker#3 is starting Round#1
+2025.07.30-20:17:38.449[32m info [39m [caliper] [worker-message-handler] 	Worker#4 is starting Round#1
+2025.07.30-20:17:38.550[32m info [39m [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2025.07.30-20:17:38.552[32m info [39m [caliper] [caliper-worker] 	Worker #4 starting workload loop
+2025.07.30-20:17:38.552[32m info [39m [caliper] [caliper-worker] 	Worker #3 starting workload loop
+2025.07.30-20:17:38.554[32m info [39m [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2025.07.30-20:17:38.564[32m info [39m [caliper] [caliper-worker] 	Worker #2 starting workload loop
+2025.07.30-20:17:41.395[32m info [39m [caliper] [default-observer] 	[query Round 1 Transaction Info] - Submitted: 204 Succ: 200 Fail:0 Unfinished:4
+2025.07.30-20:17:46.397[32m info [39m [caliper] [default-observer] 	[query Round 1 Transaction Info] - Submitted: 705 Succ: 700 Fail:0 Unfinished:5
+2025.07.30-20:17:49.603[32m info [39m [caliper] [worker-message-handler] 	Worker#1 finished Round#1
+2025.07.30-20:17:49.605[32m info [39m [caliper] [worker-message-handler] 	Worker#4 finished Round#1
+2025.07.30-20:17:49.606[32m info [39m [caliper] [worker-message-handler] 	Worker#3 finished Round#1
+2025.07.30-20:17:49.607[32m info [39m [caliper] [worker-message-handler] 	Worker#0 finished Round#1
+2025.07.30-20:17:49.615[32m info [39m [caliper] [worker-message-handler] 	Worker#2 finished Round#1
+2025.07.30-20:17:54.619[32m info [39m [caliper] [default-observer] 	Resetting txCount indicator count
+2025.07.30-20:17:54.620[32m info [39m [caliper] [report-builder] 	### Test result ###
+2025.07.30-20:17:54.622[32m info [39m [caliper] [report-builder] 	
++-------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name  | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|-------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| query | 1000 | 0    | 100.4           | 0.02            | 0.00            | 0.00            | 100.4            |
++-------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2025.07.30-20:17:54.625[32m info [39m [caliper] [report-builder] 	### docker resource stats ###'
+2025.07.30-20:17:54.628[32m info [39m [caliper] [report-builder] 	
++--------+-----------+-----------+------------------+------------------+----------------+-----------------+-----------------+---------------+
+| Name   | CPU%(max) | CPU%(avg) | Memory(max) [MB] | Memory(avg) [MB] | Traffic In [B] | Traffic Out [B] | Disc Write [KB] | Disc Read [B] |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node3 | 0.0775    | 0.04      | 538              | 538              | 0.00           | 0.00            | 0.00            | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node5 | 0.02625   | 0.02375   | 503              | 503              | 0.00           | 0.00            | 320             | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node1 | 0.0775    | 0.04375   | 484              | 484              | 0.00           | 0.00            | 168             | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node4 | 0.09125   | 0.0675    | 533              | 533              | 0.00           | 0.00            | 140             | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node6 | 0.07375   | 0.04375   | 511              | 511              | 0.00           | 0.00            | 292             | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node2 | 0.58375   | 0.24625   | 708              | 707              | 0.00           | 0.00            | 772             | 0.00          |
++--------+-----------+-----------+------------------+------------------+----------------+-----------------+-----------------+---------------+
+
+2025.07.30-20:17:54.629[32m info [39m [caliper] [round-orchestrator] 	Finished round 2 (query) in 10.064 seconds
+2025.07.30-20:17:54.629[32m info [39m [caliper] [monitor.js] 	Stopping all monitors
+2025.07.30-20:17:54.730[32m info [39m [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2025.07.30-20:17:59.735[32m info [39m [caliper] [round-orchestrator] 	Started round 3 (transfer)
+2025.07.30-20:17:59.737[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#2
+2025.07.30-20:17:59.740[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#2
+2025.07.30-20:17:59.741[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#2 for Round#2
+2025.07.30-20:17:59.743[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#3 for Round#2
+2025.07.30-20:17:59.744[32m info [39m [caliper] [worker-message-handler] 	Preparing Worker#4 for Round#2
+2025.07.30-20:17:59.819[32m info [39m [caliper] [caliper-worker] 	Info: worker 2 prepare test phase for round 2 is starting...
+2025.07.30-20:17:59.821[32m info [39m [caliper] [caliper-worker] 	Info: worker 3 prepare test phase for round 2 is starting...
+2025.07.30-20:17:59.821[32m info [39m [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 2 is starting...
+2025.07.30-20:17:59.822[32m info [39m [caliper] [caliper-worker] 	Info: worker 2 prepare test phase for round 2 is completed
+2025.07.30-20:17:59.822[32m info [39m [caliper] [worker-message-handler] 	Worker#2 prepared for Round#2
+2025.07.30-20:17:59.822[32m info [39m [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 2 is starting...
+2025.07.30-20:17:59.823[32m info [39m [caliper] [caliper-worker] 	Info: worker 3 prepare test phase for round 2 is completed
+2025.07.30-20:17:59.823[32m info [39m [caliper] [caliper-worker] 	Info: worker 4 prepare test phase for round 2 is starting...
+2025.07.30-20:17:59.823[32m info [39m [caliper] [worker-message-handler] 	Worker#3 prepared for Round#2
+2025.07.30-20:17:59.824[32m info [39m [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 2 is completed
+2025.07.30-20:17:59.824[32m info [39m [caliper] [worker-message-handler] 	Worker#0 prepared for Round#2
+2025.07.30-20:17:59.825[32m info [39m [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 2 is completed
+2025.07.30-20:17:59.825[32m info [39m [caliper] [caliper-worker] 	Info: worker 4 prepare test phase for round 2 is completed
+2025.07.30-20:17:59.825[32m info [39m [caliper] [worker-message-handler] 	Worker#1 prepared for Round#2
+2025.07.30-20:17:59.825[32m info [39m [caliper] [worker-message-handler] 	Worker#4 prepared for Round#2
+2025.07.30-20:17:59.827[32m info [39m [caliper] [worker-orchestrator] 	5 workers prepared, progressing to test phase.
+2025.07.30-20:18:01.867[32m info [39m [caliper] [round-orchestrator] 	Monitors successfully started
+2025.07.30-20:18:01.869[32m info [39m [caliper] [worker-message-handler] 	Worker#0 is starting Round#2
+2025.07.30-20:18:01.870[32m info [39m [caliper] [worker-message-handler] 	Worker#1 is starting Round#2
+2025.07.30-20:18:01.871[32m info [39m [caliper] [worker-message-handler] 	Worker#2 is starting Round#2
+2025.07.30-20:18:01.873[32m info [39m [caliper] [worker-message-handler] 	Worker#3 is starting Round#2
+2025.07.30-20:18:01.874[32m info [39m [caliper] [worker-message-handler] 	Worker#4 is starting Round#2
+2025.07.30-20:18:01.945[32m info [39m [caliper] [caliper-worker] 	Worker #3 starting workload loop
+2025.07.30-20:18:01.946[32m info [39m [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2025.07.30-20:18:01.947[32m info [39m [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2025.07.30-20:18:01.947[32m info [39m [caliper] [caliper-worker] 	Worker #2 starting workload loop
+2025.07.30-20:18:01.948[32m info [39m [caliper] [caliper-worker] 	Worker #4 starting workload loop
+2025.07.30-20:18:04.832[32m info [39m [caliper] [default-observer] 	[transfer Round 2 Transaction Info] - Submitted: 12 Succ: 0 Fail:0 Unfinished:12
+2025.07.30-20:18:09.833[32m info [39m [caliper] [default-observer] 	[transfer Round 2 Transaction Info] - Submitted: 40 Succ: 20 Fail:0 Unfinished:20
+2025.07.30-20:18:14.834[32m info [39m [caliper] [default-observer] 	[transfer Round 2 Transaction Info] - Submitted: 50 Succ: 45 Fail:0 Unfinished:5
+2025.07.30-20:18:16.062[32m info [39m [caliper] [worker-message-handler] 	Worker#3 finished Round#2
+2025.07.30-20:18:16.064[32m info [39m [caliper] [worker-message-handler] 	Worker#2 finished Round#2
+2025.07.30-20:18:16.065[32m info [39m [caliper] [worker-message-handler] 	Worker#0 finished Round#2
+2025.07.30-20:18:16.066[32m info [39m [caliper] [worker-message-handler] 	Worker#4 finished Round#2
+2025.07.30-20:18:16.066[32m info [39m [caliper] [worker-message-handler] 	Worker#1 finished Round#2
+2025.07.30-20:18:21.071[32m info [39m [caliper] [default-observer] 	Resetting txCount indicator count
+2025.07.30-20:18:21.072[32m info [39m [caliper] [report-builder] 	### Test result ###
+2025.07.30-20:18:21.073[32m info [39m [caliper] [report-builder] 	
++----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name     | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|----------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| transfer | 50   | 0    | 5.6             | 4.18            | 0.16            | 2.17            | 3.8              |
++----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2025.07.30-20:18:21.076[32m info [39m [caliper] [report-builder] 	### docker resource stats ###'
+2025.07.30-20:18:21.079[32m info [39m [caliper] [report-builder] 	
++--------+-----------+-----------+------------------+------------------+----------------+-----------------+-----------------+---------------+
+| Name   | CPU%(max) | CPU%(avg) | Memory(max) [MB] | Memory(avg) [MB] | Traffic In [B] | Traffic Out [B] | Disc Write [KB] | Disc Read [B] |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node3 | 0.11125   | 0.06625   | 538              | 538              | 0.00           | 0.00            | 332             | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node5 | 0.04375   | 0.02625   | 503              | 503              | 0.00           | 0.00            | 168             | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node1 | 0.07875   | 0.035     | 484              | 484              | 0.00           | 0.00            | 0.00            | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node4 | 0.0375    | 0.02375   | 534              | 534              | 0.00           | 0.00            | 300             | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node6 | 0.42375   | 0.12      | 511              | 511              | 0.00           | 0.00            | 156             | 0.00          |
+|--------|-----------|-----------|------------------|------------------|----------------|-----------------|-----------------|---------------|
+| /node2 | 0.0575    | 0.0375    | 708              | 708              | 0.00           | 0.00            | 472             | 0.00          |
++--------+-----------+-----------+------------------+------------------+----------------+-----------------+-----------------+---------------+
+
+2025.07.30-20:18:21.080[32m info [39m [caliper] [round-orchestrator] 	Finished round 3 (transfer) in 13.12 seconds
+2025.07.30-20:18:21.080[32m info [39m [caliper] [monitor.js] 	Stopping all monitors
+2025.07.30-20:18:21.180[32m info [39m [caliper] [report-builder] 	### All test results ###
+2025.07.30-20:18:21.182[32m info [39m [caliper] [report-builder] 	
++----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name     | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|----------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| open     | 1000 | 0    | 50.2            | 6.46            | 1.15            | 3.99            | 40.2             |
+|----------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| query    | 1000 | 0    | 100.4           | 0.02            | 0.00            | 0.00            | 100.4            |
+|----------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| transfer | 50   | 0    | 5.6             | 4.18            | 0.16            | 2.17            | 3.8              |
++----------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2025.07.30-20:18:21.206[32m info [39m [caliper] [report-builder] 	Generated report with path /home/gercom/rede_recurso/besu-production-docker/testes/caliper_runs/report_run_2.html
+2025.07.30-20:18:21.206[32m info [39m [caliper] [monitor.js] 	Stopping all monitors
+2025.07.30-20:18:21.206[32m info [39m [caliper] [worker-orchestrator] 	Sending exit message to connected workers
+2025.07.30-20:18:21.208[32m info [39m [caliper] [round-orchestrator] 	Benchmark finished in 83.324 seconds. Total rounds: 3. Successful rounds: 3. Failed rounds: 0.
+2025.07.30-20:18:21.208[32m info [39m [caliper] [caliper-engine] 	Network configuration attribute "caliper.command.end" is not present, skipping end command
+2025.07.30-20:18:21.208[32m info [39m [caliper] [cli-launch-manager] 	Benchmark successfully finished!
+2025.07.30-20:18:21.208[32m info [39m [caliper] [worker-message-handler] 	Worker#1 is exiting
+2025.07.30-20:18:21.208[32m info [39m [caliper] [worker-message-handler] 	Worker#0 is exiting
+2025.07.30-20:18:21.209[32m info [39m [caliper] [worker-message-handler] 	Worker#4 is exiting
+2025.07.30-20:18:21.209[32m info [39m [caliper] [worker-message-handler] 	Worker#2 is exiting
+2025.07.30-20:18:21.209[32m info [39m [caliper] [worker-message-handler] 	Worker#3 is exiting
