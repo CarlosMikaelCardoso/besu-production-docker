@@ -10,7 +10,6 @@ const BESU_RPC_URL = "http://localhost:8545";
 const DEPLOYER_PRIVATE_KEY = "0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63";
 
 // !!! IMPORTANTE: SUBSTITUA ESTE ENDEREÇO PELO ENDEREÇO REAL DO SEU CONTRATO IMPLANTADO !!!
-// Ele deve ser o mesmo que está em 'contract_address.txt'
 const CONTRACT_ADDRESS = "0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741"; 
 const CONTRACT_ABI = [
     { "constant": false, "inputs": [ { "internalType": "string", "name": "acc_from", "type": "string" }, { "internalType": "string", "name": "acc_to", "type": "string" }, { "internalType": "int256", "name": "amount", "type": "int256" } ], "name": "transfer", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
@@ -23,84 +22,80 @@ const provider = new ethers.JsonRpcProvider(BESU_RPC_URL);
 const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-// --- SISTEMA DE FILA DE TRANSAÇÕES (MODELO WORKER) ---
-const transactionQueue = [];
-let isProcessing = false;
-let currentNonce;
-
-async function transactionWorker() {
-    if (isProcessing || transactionQueue.length === 0) return;
-    isProcessing = true;
-    while (transactionQueue.length > 0) {
-        const task = transactionQueue.shift();
-        try {
-            // Adiciona um log antes de submeter a transação
-            console.log(`Tentando submeter transação: ${task.name} com nonce ${currentNonce}`);
-            const tx = await task.action({ nonce: currentNonce });
-            console.log(`Transação submetida. Nonce: ${currentNonce}, Hash: ${tx.hash}`);
-            currentNonce++;
-        } catch (error) {
-            console.error(`Falha ao processar tarefa '${task.name}'. Nonce: ${currentNonce}. Erro: ${error.message}`);
-            // Em caso de erro, você pode querer tentar novamente ou ter uma estratégia de fallback
-            // Por enquanto, apenas logamos o erro.
-            currentNonce++; // Incrementa o nonce mesmo em caso de falha para evitar nonce stuck
-        }
-    }
-    isProcessing = false;
-}
-
-function enqueueAndProcess(task) {
-    transactionQueue.push(task);
-    transactionWorker();
-}
-
 // --- Endpoints da API ---
-app.post('/open', (req, res) => {
+
+// MODIFICAÇÃO: O endpoint agora é 'async' para poder usar 'await'.
+app.post('/open', async (req, res) => {
     const { accountId, amount } = req.body;
     if (!accountId || amount === undefined) {
         return res.status(400).json({ error: "Campos 'accountId' e 'amount' são obrigatórios." });
     }
-    enqueueAndProcess({ name: 'open', action: (opts) => contract.open(accountId, amount, opts) });
-    res.status(202).json({ 
-        message: "Pedido 'open' recebido e enfileirado.",
-        data: req.body 
-    });
+
+    try {
+        console.log(`Recebido pedido 'open' para a conta: ${accountId}. Submetendo para a blockchain...`);
+        
+        // 1. Submete a transação para a rede
+        const tx = await contract.open(accountId, amount);
+        
+        // 2. Espera a transação ser minerada e confirmada (aqui é a grande mudança)
+        const receipt = await tx.wait();
+        
+        console.log(`Transação 'open' concluída com sucesso! Hash: ${receipt.hash}`);
+        
+        // 3. Retorna 200 OK com o hash da transação apenas após a confirmação.
+        res.status(200).json({ 
+            message: "Transação 'open' confirmada na blockchain.",
+            transactionHash: receipt.hash 
+        });
+
+    } catch (error) {
+        console.error(`Erro ao processar transação 'open' para a conta ${accountId}:`, error);
+        res.status(500).json({ error: "Falha ao confirmar a transação 'open'.", details: error.message });
+    }
 });
 
-app.post('/transfer', (req, res) => {
+// MODIFICAÇÃO: O endpoint agora é 'async' para poder usar 'await'.
+app.post('/transfer', async (req, res) => {
     const { from, to, amount } = req.body;
     if (!from || !to || amount === undefined) {
         return res.status(400).json({ error: "Os campos 'from', 'to' e 'amount' são obrigatórios." });
     }
-    enqueueAndProcess({ name: 'transfer', action: (opts) => contract.transfer(from, to, amount, opts) });
-    res.status(202).json({ 
-        message: "Pedido 'transfer' recebido e enfileirado.",
-        data: req.body
-    });
+
+    try {
+        console.log(`Recebido pedido 'transfer' de ${from} para ${to}. Submetendo para a blockchain...`);
+
+        // 1. Submete a transação
+        const tx = await contract.transfer(from, to, amount);
+        
+        // 2. Espera pela confirmação
+        const receipt = await tx.wait();
+
+        console.log(`Transação 'transfer' concluída com sucesso! Hash: ${receipt.hash}`);
+
+        // 3. Retorna 200 OK apenas após a confirmação
+        res.status(200).json({ 
+            message: "Transação 'transfer' confirmada na blockchain.",
+            transactionHash: receipt.hash 
+        });
+
+    } catch (error) {
+        console.error(`Erro ao processar transação 'transfer' de ${from} para ${to}:`, error);
+        res.status(500).json({ error: "Falha ao confirmar a transação 'transfer'.", details: error.message });
+    }
 });
 
 app.get('/query/:accountId', async (req, res) => {
     try {
-        // Loga o accountId que está sendo consultado
-        console.log(`Tentando consultar saldo para accountId: ${req.params.accountId}`);
         const balance = await contract.query(req.params.accountId);
         res.status(200).json({ accountId: req.params.accountId, balance: balance.toString() });
     } catch (error) {
-        console.error(`Falha ao executar a função 'query' para accountId: ${req.params.accountId}. Erro: ${error.message}`);
+        console.error(`Falha ao executar 'query' para a conta ${req.params.accountId}:`, error);
         res.status(500).json({ error: "Falha ao executar a função 'query'.", details: error.message });
     }
 });
 
-// --- Iniciar o Servidor e obter o nonce inicial ---
-(async () => {
-    try {
-        currentNonce = await provider.getTransactionCount(signer.address, 'latest');
-        app.listen(port, () => {
-            console.log(`Servidor da API com Worker a correr em http://10.126.1.238:${port}`);
-            console.log(`Nonce inicial obtido: ${currentNonce}`);
-        });
-    } catch (error) {
-        console.error("Falha ao inicializar o servidor e obter o nonce. Verifique a conexão com o nó Besu.", error);
-        process.exit(1);
-    }
-})();
+// --- Iniciar o Servidor ---
+app.listen(port, () => {
+    console.log(`Servidor da API a correr em http://10.126.1.238:${port}`);
+    console.log("Modo de operação: Síncrono (espera a confirmação da transação).");
+});

@@ -94,8 +94,8 @@ parse_jtl_for_html() {
 
 # --- FUNÇÃO PARA GERAR O RELATÓRIO HTML ---
 generate_html_report() {
-    local run_dir=$1
-    local report_file="$run_dir/jmeter_docker_report.html"
+    local run_number=$1
+    local report_file="$JMETER_RUNS_DIR/jmeter_docker_report_run_${run_number}.html"
     local rounds=("Open" "Query" "Transfer")
 
     # Inicia o ficheiro HTML com o cabeçalho e estilos
@@ -103,22 +103,10 @@ generate_html_report() {
 <!doctype html>
 <html>
 <head>
-    <title>JMeter & Docker Report</title>
+    <title>JMeter & Docker Report (Run ${run_number})</title>
     <meta charset="UTF-8"/>
     <style type="text/css">
-        body { font-family: IBM Plex Sans; font-weight: 200; }
-        .left-column { position: fixed; width:20%; }
-        .left-column ul { display: block; padding: 0; list-style: none; border-bottom: 1px solid #d9d9d9; font-size: 14px; }
-        .left-column h2 { font-size: 24px; font-weight: 400; margin-block-end: 0.5em; }
-        .left-column h3 { font-size: 18px; font-weight: 400; margin-block-end: 0.5em; }
-        .left-column li { margin-left: 10px; margin-bottom: 5px; color: #5e6b73; }
-        .right-column { margin-left: 22%; width:60%; }
-        .right-column table { font-size:11px; color:#333333; border-width: 1px; border-color: #666666; border-collapse: collapse; margin-bottom: 10px; }
-        .right-column h2, .right-column h3, .right-column h4 { font-weight: 400; }
-        .right-column h4 { margin-block-end: 0; }
-        .right-column th { border-width: 1px; font-size: small; padding: 8px; border-style: solid; border-color: #666666; background-color: #f2f2f2; }
-        .right-column td { border-width: 1px; font-size: small; padding: 8px; border-style: solid; border-color: #666666; background-color: #ffffff; font-weight: 400; }
-        .tag { margin-bottom: 10px; padding: 5px 10px; }
+        body { font-family: IBM Plex Sans; font-weight: 200; } .left-column { position: fixed; width:20%; } .left-column ul { display: block; padding: 0; list-style: none; border-bottom: 1px solid #d9d9d9; font-size: 14px; } .left-column h3 { font-size: 18px; font-weight: 400; margin-block-end: 0.5em; } .left-column li { margin-left: 10px; margin-bottom: 5px; color: #5e6b73; } .right-column { margin-left: 22%; width:60%; } .right-column table { font-size:11px; color:#333333; border-width: 1px; border-color: #666666; border-collapse: collapse; margin-bottom: 10px; } .right-column h1, .right-column h2, .right-column h3, .right-column h4 { font-weight: 400; } .right-column h4 { margin-block-end: 0; } .right-column th { border-width: 1px; font-size: small; padding: 8px; border-style: solid; border-color: #666666; background-color: #f2f2f2; } .right-column td { border-width: 1px; font-size: small; padding: 8px; border-style: solid; border-color: #666666; background-color: #ffffff; font-weight: 400; }
     </style>
 </head>
 <body>
@@ -128,7 +116,7 @@ generate_html_report() {
             <ul>
                 <h3>&nbspBasic information</h3>
                 <li>Tool: &nbsp<span style="font-weight: 500;">JMeter & Docker</span></li>
-                <li>Benchmark Rounds: &nbsp<span style="font-weight: 500;">3</span></li>
+                <li>Execution: &nbsp<span style="font-weight: 500;">Run ${run_number}</span></li>
             </ul>
             <ul>
                 <h3>&nbspBenchmark results</h3>
@@ -142,7 +130,7 @@ EOF
     # Tabela de Sumário de Performance
     echo "<div style=\"border-bottom: 1px solid #d9d9d9; margin-bottom: 10px;\" id=\"benchmarksummary\"><h3>Summary of performance metrics</h3><table style=\"min-width: 100%;\"><tr><th>Name</th><th>Succ</th><th>Fail</th><th>Send Rate (TPS)</th><th>Max Latency (s)</th><th>Min Latency (s)</th><th>Avg Latency (s)</th><th>Throughput (TPS)</th></tr>" >> "$report_file"
     for round_name in "${rounds[@]}"; do
-        jtl_file="$run_dir/results_${round_name,,}.jtl"
+        jtl_file="$JMETER_RUNS_DIR/results_${round_name,,}_run_${run_number}.jtl"
         perf_data=($(parse_jtl_for_html "$jtl_file"))
         echo "<tr><td>${round_name}</td><td>${perf_data[0]}</td><td>${perf_data[1]}</td><td>${perf_data[2]}</td><td>${perf_data[3]}</td><td>${perf_data[4]}</td><td>${perf_data[5]}</td><td>${perf_data[6]}</td></tr>" >> "$report_file"
     done
@@ -150,8 +138,8 @@ EOF
 
     # Secções detalhadas para cada Round
     for round_name in "${rounds[@]}"; do
-        jtl_file="$run_dir/results_${round_name,,}.jtl"
-        docker_stats_log="$run_dir/docker_stats_${round_name,,}.log"
+        jtl_file="$JMETER_RUNS_DIR/results_${round_name,,}_run_${run_number}.jtl"
+        docker_stats_log="$JMETER_RUNS_DIR/docker_stats_${round_name,,}_run_${run_number}.log"
         perf_data=($(parse_jtl_for_html "$jtl_file"))
 
         echo "<div style=\"border-bottom: 1px solid #d9d9d9; padding-bottom: 10px;\" id=\"${round_name,,}\"><h2>Benchmark round: ${round_name}</h2><h3>Performance metrics for ${round_name}</h3><table style=\"min-width: 100%;\"><tr><th>Name</th><th>Succ</th><th>Fail</th><th>Send Rate (TPS)</th><th>Max Latency (s)</th><th>Min Latency (s)</th><th>Avg Latency (s)</th><th>Throughput (TPS)</th></tr><tr><td>${round_name}</td><td>${perf_data[0]}</td><td>${perf_data[1]}</td><td>${perf_data[2]}</td><td>${perf_data[3]}</td><td>${perf_data[4]}</td><td>${perf_data[5]}</td><td>${perf_data[6]}</td></tr></table>" >> "$report_file"
@@ -207,17 +195,18 @@ ACCOUNT_CSV_FILE="$(pwd)/ethereum_accounts.csv"
 for (( i=1; i<=$NUM_REPETITIONS; i++ ))
 do
     echo -e "\n--- Iniciando Execução JMeter #$i de $NUM_REPETITIONS ---"
-    CURRENT_JMETER_RUN_DIR="$JMETER_RUNS_DIR/run_$i"
-    mkdir -p "$CURRENT_JMETER_RUN_DIR"
 
-    # Função para executar um round e monitorizá-lo
+    # MODIFICAÇÃO: Função para executar um round e monitorizá-lo
     run_test_and_monitor() {
         local JMX_FILE=$1
         local ROUND_NAME=$2
-        local JTL_FILE="$CURRENT_JMETER_RUN_DIR/results_${ROUND_NAME,,}.jtl"
-        local DOCKER_STATS_LOG="$CURRENT_JMETER_RUN_DIR/docker_stats_${ROUND_NAME,,}.log"
+        local RUN_NUMBER=$3
+        
+        # Constrói nomes de ficheiros com o número da execução
+        local JTL_FILE="$JMETER_RUNS_DIR/results_${ROUND_NAME,,}_run_${RUN_NUMBER}.jtl"
+        local DOCKER_STATS_LOG="$JMETER_RUNS_DIR/docker_stats_${ROUND_NAME,,}_run_${RUN_NUMBER}.log"
 
-        echo -e "\n--- Executando Round: $ROUND_NAME ---"
+        echo -e "\n--- Executando Round: $ROUND_NAME (Execução #${RUN_NUMBER}) ---"
         rm -f "$DOCKER_STATS_LOG"
         touch "$DOCKER_STATS_LOG"
 
@@ -237,13 +226,13 @@ do
         kill "$MONITOR_PID"
     }
 
-    # Executa cada round separadamente
-    run_test_and_monitor "$JMX_OPEN" "Open"
-    run_test_and_monitor "$JMX_QUERY" "Query"
-    run_test_and_monitor "$JMX_TRANSFER" "Transfer"
+    # Executa cada round separadamente, passando o número da execução
+    run_test_and_monitor "$JMX_OPEN" "Open" "$i"
+    run_test_and_monitor "$JMX_QUERY" "Query" "$i"
+    run_test_and_monitor "$JMX_TRANSFER" "Transfer" "$i"
 
     # Gera o relatório HTML no final da execução
-    generate_html_report "$CURRENT_JMETER_RUN_DIR"
+    generate_html_report "$i"
 
 done
 
