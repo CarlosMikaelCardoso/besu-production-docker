@@ -29,10 +29,12 @@ const CONTRACT_ABI = [
 const provider = new ethers.JsonRpcProvider(BESU_RPC_URL);
 const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-let openTxCount = 1;
 
-// MODIFICAÇÃO: Gerenciamento manual de nonce para lidar com alta concorrência
-// Inicializa uma promessa que resolve para o próximo nonce pendente da conta do signer.
+// Contadores para as transações
+let openTxCount = 1;
+let transferTxCount = 1;
+
+// Gerenciamento manual de nonce para lidar com alta concorrência
 let noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
 
 // --- Lógica de Monitoramento do Docker ---
@@ -116,13 +118,10 @@ app.post('/open', async (req, res) => {
         return res.status(400).json({ error: "Campos 'accountId' e 'amount' são obrigatórios." });
     }
     try {
-        // MODIFICAÇÃO: Obtém o próximo nonce de forma atômica
         const nonce = await noncePromise;
-        // Prepara a promessa para a próxima transação, incrementando o nonce
         noncePromise = Promise.resolve(nonce + 1);
 
         console.log(`Recebido pedido 'open' para a conta: ${accountId}. Submetendo com nonce ${nonce}...`);
-        // Envia a transação com o nonce explícito
         const tx = await contract.open(accountId, amount, { nonce });
         const receipt = await tx.wait();
         console.log(`Transação 'open' #${openTxCount} confirmada com sucesso! Hash: ${receipt.hash}`);
@@ -133,7 +132,6 @@ app.post('/open', async (req, res) => {
         });
     } catch (error) {
         console.error(`Erro ao processar transação 'open' para a conta ${accountId}:`, error);
-        // Em caso de erro, reinicia a contagem de nonce para evitar bloqueios
         if (error.code === 'NONCE_EXPIRED' || error.code === 'REPLACEMENT_UNDERPRICED') {
             noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
             console.error("Nonce dessincronizado. A reiniciar a contagem de nonce.");
@@ -148,23 +146,23 @@ app.post('/transfer', async (req, res) => {
         return res.status(400).json({ error: "Os campos 'from', 'to' e 'amount' são obrigatórios." });
     }
     try {
-        // MODIFICAÇÃO: Obtém o próximo nonce de forma atômica
         const nonce = await noncePromise;
-        // Prepara a promessa para a próxima transação, incrementando o nonce
         noncePromise = Promise.resolve(nonce + 1);
 
         console.log(`Recebido pedido 'transfer' de ${from} para ${to}. Submetendo com nonce ${nonce}...`);
-        // Envia a transação com o nonce explícito
         const tx = await contract.transfer(from, to, amount, { nonce });
         const receipt = await tx.wait();
-        console.log(`Transação 'transfer' confirmada com sucesso! Hash: ${receipt.hash}`);
+        
+        // MODIFICAÇÃO: Adicionado log com o contador de transferências
+        console.log(`Transação 'transfer' #${transferTxCount} confirmada com sucesso! Hash: ${receipt.hash}`);
+        transferTxCount++; // Incrementa o contador
+
         res.status(200).json({
             message: "Transação 'transfer' confirmada na blockchain.",
             transactionHash: receipt.hash
         });
     } catch (error) {
         console.error(`Erro ao processar transação 'transfer' de ${from} para ${to}:`, error);
-        // Em caso de erro, reinicia a contagem de nonce para evitar bloqueios
         if (error.code === 'NONCE_EXPIRED' || error.code === 'REPLACEMENT_UNDERPRICED') {
             noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
             console.error("Nonce dessincronizado. A reiniciar a contagem de nonce.");
@@ -175,8 +173,13 @@ app.post('/transfer', async (req, res) => {
 
 app.get('/query/:accountId', async (req, res) => {
     try {
-        const balance = await contract.query(req.params.accountId);
-        res.status(200).json({ accountId: req.params.accountId, balance: balance.toString() });
+        const accountId = req.params.accountId;
+        const balance = await contract.query(accountId);
+        
+        // MODIFICAÇÃO: Adicionado log para mostrar os dados da consulta
+        console.log(`Consulta para conta: ${accountId}, Saldo encontrado: ${balance.toString()}`);
+
+        res.status(200).json({ accountId: accountId, balance: balance.toString() });
     } catch (error) {
         console.error(`Falha ao executar 'query' para a conta ${req.params.accountId}:`, error);
         res.status(500).json({ error: "Falha ao executar a função 'query'.", details: error.message });
