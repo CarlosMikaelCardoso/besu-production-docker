@@ -1,30 +1,23 @@
 const express = require('express');
 const { ethers } = require('ethers');
+const { spawn } = require('child_process'); // Módulo para executar processos externos
+const fs = require('fs'); // Módulo para interagir com o sistema de ficheiros
+const path = require('path'); // Módulo para lidar com caminhos de ficheiros
 
 // --- Configuração da Aplicação e Conexão ---
 const app = express();
 const port = 3000;
 app.use(express.json());
 
-/*
-AJUSTE: As configurações críticas (URL do RPC, chave privada e endereço do contrato)
-são carregadas a partir de variáveis de ambiente. Isso evita expor dados
-sensíveis no código-fonte e facilita a execução em diferentes ambientes.
-*/
-
-// Exporta as variáveis de ambiente necessárias para a configuração do Besu.
-// export BESU_RPC_URL="http://localhost:8545"
-// export DEPLOYER_PRIVATE_KEY="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
-// export CONTRACT_ADDRESS="0x42699A7612A82f1d9C36148af9C77354759b210b"
-
+// --- Configuração do Ethers e Contrato ---
 const BESU_RPC_URL = process.env.BESU_RPC_URL || "http://localhost:8545";
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
-// Validação para garantir que as variáveis essenciais foram definidas no ambiente
+// Validação para garantir que as variáveis essenciais foram definidas
 if (!DEPLOYER_PRIVATE_KEY || !CONTRACT_ADDRESS) {
     console.error("Erro Crítico: As variáveis de ambiente DEPLOYER_PRIVATE_KEY e CONTRACT_ADDRESS são obrigatórias.");
-    process.exit(1); // Encerra a aplicação se as variáveis não estiverem configuradas
+    process.exit(1);
 }
 
 const CONTRACT_ABI = [
@@ -33,15 +26,89 @@ const CONTRACT_ABI = [
     { "constant": false, "inputs": [ { "internalType": "string", "name": "acc_id", "type": "string" }, { "internalType": "int256", "name": "amount", "type": "int256" } ], "name": "open", "outputs": [], "stateMutability": "nonpayable", "type": "function" }
 ];
 
-// --- Inicialização do Ethers ---
 const provider = new ethers.JsonRpcProvider(BESU_RPC_URL);
 const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-let count = 1;
+let openTxCount = 1;
 
-// --- Endpoints da API ---
+// --- Lógica de Monitoramento do Docker ---
 
-// O endpoint agora é 'async' para poder usar 'await'.
+const monitoringProcesses = {};
+const DOCKER_CONTAINERS_TO_MONITOR = ["node1", "node2", "node3", "node4", "node5", "node6"];
+
+/**
+ * Endpoint para iniciar o monitoramento do Docker para um round de teste específico.
+ */
+app.post('/monitor/start', (req, res) => {
+    const { roundName, runNumber, logPath } = req.body;
+    if (!roundName || !runNumber || !logPath) {
+        return res.status(400).json({ error: "Campos 'roundName', 'runNumber' e 'logPath' são obrigatórios." });
+    }
+
+    const runId = `${roundName}_run_${runNumber}`;
+    if (monitoringProcesses[runId]) {
+        return res.status(409).json({ message: `O monitoramento para ${runId} já está em execução.` });
+    }
+
+    console.log(`Iniciando monitoramento para: ${runId}. A gravar em: ${logPath}`);
+
+    // Garante que o diretório de logs existe
+    const dir = path.dirname(logPath);
+    if (!fs.existsSync(dir)){
+        fs.mkdirSync(dir, { recursive: true });
+    }
+
+    // Cria um stream para o ficheiro de log
+    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+
+    // Função que executa 'docker stats' e escreve no stream
+    const getStats = () => {
+        const monitorProcess = spawn('docker', [
+            'stats', '--no-stream', '--format', '{{.Name}},{{.CPUPerc}},{{.MemUsage}}', ...DOCKER_CONTAINERS_TO_MONITOR
+        ]);
+        
+        monitorProcess.stdout.pipe(logStream, { end: false }); // Não fecha o stream de escrita
+        monitorProcess.stderr.on('data', (data) => {
+            console.error(`Erro no docker stats para ${runId}: ${data}`);
+        });
+    };
+    
+    // Executa a função imediatamente e depois a cada segundo
+    getStats();
+    const intervalId = setInterval(getStats, 1000);
+
+    // Armazena o ID do intervalo para poder pará-lo mais tarde
+    monitoringProcesses[runId] = { interval: intervalId, stream: logStream };
+
+    res.status(202).json({ message: `Monitoramento para ${runId} iniciado.` });
+});
+
+/**
+ * Endpoint para parar o monitoramento do Docker.
+ */
+app.post('/monitor/stop', (req, res) => {
+    const { roundName, runNumber } = req.body;
+    if (!roundName || !runNumber) {
+        return res.status(400).json({ error: "Campos 'roundName' e 'runNumber' são obrigatórios." });
+    }
+
+    const runId = `${roundName}_run_${runNumber}`;
+    const processInfo = monitoringProcesses[runId];
+
+    if (processInfo) {
+        console.log(`Parando monitoramento para: ${runId}`);
+        clearInterval(processInfo.interval); // Para o loop de recolha
+        processInfo.stream.end(); // Fecha o stream do ficheiro
+        delete monitoringProcesses[runId];
+        res.status(200).json({ message: `Monitoramento para ${runId} parado.` });
+    } else {
+        res.status(404).json({ message: `Nenhum processo de monitoramento encontrado para ${runId}.` });
+    }
+});
+
+
+// --- Endpoints de Transação (Síncronos) ---
+
 app.post('/open', async (req, res) => {
     const { accountId, amount } = req.body;
     if (!accountId || amount === undefined) {
@@ -49,11 +116,11 @@ app.post('/open', async (req, res) => {
     }
 
     try {
-        console.log(`Recebido pedido 'open' para a conta: ${accountId}. Submetendo para a blockchain...`);
+        console.log(`Recebido pedido 'open' para a conta: ${accountId}. Submetendo...`);
         const tx = await contract.open(accountId, amount);
-        const receipt = await tx.wait(); // Espera a transação ser confirmada
-        console.log(`Transação 'open' ${count}, concluída com sucesso! Hash: ${receipt.hash}`);
-        count++;
+        const receipt = await tx.wait();
+        console.log(`Transação 'open' #${openTxCount} confirmada com sucesso! Hash: ${receipt.hash}`);
+        openTxCount++;
         res.status(200).json({
             message: `Transação 'open' confirmada na blockchain.`,
             transactionHash: receipt.hash
@@ -65,7 +132,6 @@ app.post('/open', async (req, res) => {
     }
 });
 
-// O endpoint agora é 'async' para poder usar 'await'.
 app.post('/transfer', async (req, res) => {
     const { from, to, amount } = req.body;
     if (!from || !to || amount === undefined) {
@@ -73,10 +139,10 @@ app.post('/transfer', async (req, res) => {
     }
 
     try {
-        console.log(`Recebido pedido 'transfer' de ${from} para ${to}. Submetendo para a blockchain...`);
+        console.log(`Recebido pedido 'transfer' de ${from} para ${to}. Submetendo...`);
         const tx = await contract.transfer(from, to, amount);
-        const receipt = await tx.wait(); // Espera a transação ser confirmada
-        console.log(`Transação 'transfer' concluída com sucesso! Hash: ${receipt.hash}`);
+        const receipt = await tx.wait();
+        console.log(`Transação 'transfer' confirmada com sucesso! Hash: ${receipt.hash}`);
         res.status(200).json({
             message: "Transação 'transfer' confirmada na blockchain.",
             transactionHash: receipt.hash

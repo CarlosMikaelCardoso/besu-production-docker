@@ -5,11 +5,13 @@ JMETER_VERSION="5.6.3"
 JMETER_DIR="apache-jmeter-${JMETER_VERSION}"
 JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
 CONTRACT_ADDRESS_FILE="contract_address.txt"
+# MODIFICAÇÃO: Adicione o IP da máquina onde a API (e a rede Besu) está a ser executada
+API_HOST="10.126.1.248" # Mude para o IP da VM se o JMeter estiver noutra máquina
+
 # Configurações para o Java
 JAVA_DIR_NAME="jdk-21.0.7"
 JAVA_TAR_GZ="jdk-21.0.7_linux-x64_bin.tar.gz"
 JAVA_URL="https://download.oracle.com/java/21/archive/${JAVA_TAR_GZ}"
-# Define JAVA_HOME com base no diretório pai do script
 export JAVA_HOME="$(pwd)/../${JAVA_DIR_NAME}"
 
 # Caminhos para os planos de teste (JMX)
@@ -17,97 +19,52 @@ JMX_OPEN="test_round1_open.jmx"
 JMX_QUERY="test_round2_query.jmx"
 JMX_TRANSFER="test_round3_transfer.jmx"
 
-# Lista de contentores a serem monitorizados
-DOCKER_CONTAINERS=("node1" "node2" "node3" "node4" "node5" "node6")
-
 # === CONFIGURAÇÃO PARA EXECUÇÕES E TESTES ===
-NUM_REPETITIONS=${1:-1} # Número de vezes que o ciclo completo de testes será executado
+NUM_REPETITIONS=${1:-1}
 TESTE_DIR="$(pwd)"
 JMETER_RUNS_DIR="$TESTE_DIR/jmeter_runs"
-NUMBER_OF_ACCOUNTS=1000 # Total de contas a serem criadas, igual ao config.yaml do Caliper
-TRANSFER_TX_NUMBER=50 # Total de transações de transferência, igual ao config.yaml do Caliper
+NUMBER_OF_ACCOUNTS=1000
+TRANSFER_TX_NUMBER=50
 
-# Limpa o diretório de execuções anteriores e cria um novo
 rm -rf "$JMETER_RUNS_DIR"
 mkdir -p "$JMETER_RUNS_DIR"
 
 check_and_install_java() {
     echo "--- Verificando instalação do Java ---"
-    # Verifica se o diretório do Java e o executável existem
     if [ ! -d "$JAVA_HOME" ] || [ ! -f "${JAVA_HOME}/bin/java" ]; then
         echo "Java não encontrado. Baixando e instalando JDK ${JAVA_DIR_NAME}..."
-        
-        # Garante que o wget está instalado
-        if ! command -v wget &> /dev/null; then
-            echo "Erro: 'wget' não está instalado. Por favor, instale o wget para continuar."
-            exit 1
-        fi
-
-        # Baixa e extrai o JDK no diretório pai (../)
+        if ! command -v wget &> /dev/null; then echo "Erro: 'wget' não está instalado."; exit 1; fi
         wget -q --show-progress -O "${JAVA_TAR_GZ}" "${JAVA_URL}"
-        if [ $? -ne 0 ]; then
-            echo "Erro: Falha ao baixar o Java. Verifique a URL e sua conexão."
-            exit 1
-        fi
-        
-        # Extrai para o diretório pai, onde o JAVA_HOME espera encontrá-lo
+        if [ $? -ne 0 ]; then echo "Erro: Falha ao baixar o Java."; exit 1; fi
         tar -xzf "${JAVA_TAR_GZ}" -C "$(dirname "$JAVA_HOME")"
-        rm "${JAVA_TAR_Z}" # Limpa o arquivo baixado
-
+        rm "${JAVA_TAR_GZ}"
         echo "Java ${JAVA_DIR_NAME} instalado com sucesso."
     else
         echo "Java já está instalado em ${JAVA_HOME}"
     fi
-    
-    # Garante que o Java correto está no PATH para a execução do script
     export PATH="${JAVA_HOME}/bin:$PATH"
 }
 
-# --- AJUSTE: Função para gerar contas no estilo do Caliper ---
-# Esta função replica a lógica do simple-state.js do Caliper para gerar
-# nomes de conta (a, b, ..., z, ba, bb, etc.) e prepara os CSVs para cada fase do teste.
 generate_caliper_style_accounts_csv() {
     echo "Gerando arquivos CSV de contas no estilo Caliper..."
     local accounts_file="$JMETER_RUNS_DIR/all_accounts.txt"
     local open_csv="$JMETER_RUNS_DIR/open_accounts.csv"
     local transfer_csv="$JMETER_RUNS_DIR/transfer_accounts.csv"
-
-    # Gerador de contas em Node.js para replicar a lógica do Caliper facilmente
-    # node -e "..." é uma forma de executar um script js inline
     node -e "
         const DICTIONARY = 'abcdefghijklmnopqrstuvwxyz';
-        function get26Num(n) {
-            let result = '';
-            while(n >= 0) {
-                result = DICTIONARY.charAt(n % DICTIONARY.length) + result;
-                n = Math.floor(n / DICTIONARY.length) - 1;
-            }
-            return result;
-        }
-
+        function get26Num(n) { let result = ''; while(n >= 0) { result = DICTIONARY.charAt(n % DICTIONARY.length) + result; n = Math.floor(n / DICTIONARY.length) - 1; } return result; }
         const fs = require('fs');
         const accounts = [];
-        for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) {
-            accounts.push('user' + get26Num(i)); // Adiciona um prefixo para clareza
-        }
-
-        // Cria o CSV para o teste 'open'
+        for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) { accounts.push('user' + get26Num(i)); }
         fs.writeFileSync('${open_csv}', 'accountId\n' + accounts.join('\n'));
-
-        // Salva todas as contas para serem usadas no teste de transferência
         fs.writeFileSync('${accounts_file}', accounts.join('\n'));
-
         console.log('${NUMBER_OF_ACCOUNTS} contas geradas para os testes open e query.');
     "
     if [ $? -ne 0 ]; then echo "Erro: Falha ao gerar contas com Node.js."; exit 1; fi
-
-    # Cria o CSV para o teste 'transfer' com pares aleatórios de contas existentes
     echo "source_account,target_account" > "$transfer_csv"
     for ((i=0; i<$TRANSFER_TX_NUMBER; i++)); do
-        # shuf -n 1 seleciona uma linha aleatória do arquivo
         source_acc=$(shuf -n 1 "$accounts_file")
         target_acc=$(shuf -n 1 "$accounts_file")
-        # Garante que a conta de origem e destino não sejam a mesma
         while [[ "$source_acc" == "$target_acc" ]]; do
             target_acc=$(shuf -n 1 "$accounts_file")
         done
@@ -116,8 +73,6 @@ generate_caliper_style_accounts_csv() {
     echo "${TRANSFER_TX_NUMBER} pares de transferência gerados."
 }
 
-
-# Função para processar o JTL e retornar dados formatados (sem alterações)
 parse_jtl_for_html() {
     local jtl_file=$1
     if [ ! -f "$jtl_file" ]; then echo "0 0 N/A N/A N/A N/A N/A"; return; fi
@@ -150,7 +105,6 @@ parse_jtl_for_html() {
     }' "$jtl_file"
 }
 
-# --- FUNÇÃO PARA GERAR O RELATÓRIO HTML --- (sem alterações)
 generate_html_report() {
     local run_number=$1
     local report_file="$JMETER_RUNS_DIR/jmeter_docker_report_run_${run_number}.html"
@@ -173,7 +127,8 @@ EOF
         jtl_file="$JMETER_RUNS_DIR/results_${round_name,,}_run_${run_number}.jtl"; docker_stats_log="$JMETER_RUNS_DIR/docker_stats_${round_name,,}_run_${run_number}.log"; perf_data=($(parse_jtl_for_html "$jtl_file"))
         echo "<div style=\"border-bottom: 1px solid #d9d9d9; padding-bottom: 10px;\" id=\"${round_name,,}\"><h2>Benchmark round: ${round_name}</h2><h3>Performance metrics for ${round_name}</h3><table style=\"min-width: 100%;\"><tr><th>Name</th><th>Succ</th><th>Fail</th><th>Send Rate (TPS)</th><th>Max Latency (s)</th><th>Min Latency (s)</th><th>Avg Latency (s)</th><th>Throughput (TPS)</th></tr><tr><td>${round_name}</td><td>${perf_data[0]}</td><td>${perf_data[1]}</td><td>${perf_data[2]}</td><td>${perf_data[3]}</td><td>${perf_data[4]}</td><td>${perf_data[5]}</td><td>${perf_data[6]}</td></tr></table>" >> "$report_file"
         echo "<h3>Resource utilization for ${round_name}</h3><h4>Resource monitor: docker</h4><table style=\"min-width: 100%;\"><tr><th>Name</th><th>CPU%(max)</th><th>CPU%(avg)</th><th>Memory(max) [MB]</th><th>Memory(avg) [MB]</th></tr>" >> "$report_file"
-        for container in "${DOCKER_CONTAINERS[@]}"; do
+        # O ficheiro de log do docker agora é criado pela API, mas a lógica de parsing continua a mesma
+        for container in node1 node2 node3 node4 node5 node6; do
             if [ ! -f "$docker_stats_log" ]; then continue; fi
             CPU_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $2}' | sed 's/%//'); MEM_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $3}' | sed -e 's/MiB.*//' -e 's/GiB.*/ \* 1024/' | bc)
             if [ -n "$CPU_DATA" ]; then MAX_CPU=$(echo "$CPU_DATA"|sort -nr|head -n 1); AVG_CPU=$(echo "$CPU_DATA"|awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }'); MAX_MEM=$(echo "$MEM_DATA"|sort -nr|head -n 1); AVG_MEM=$(echo "$MEM_DATA"|awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }'); LC_NUMERIC=C echo "<tr><td>/${container}</td><td>${MAX_CPU}</td><td>${AVG_CPU}</td><td>${MAX_MEM}</td><td>${AVG_MEM}</td></tr>" >> "$report_file"; fi
@@ -181,7 +136,6 @@ EOF
     done; echo "</div></main></body></html>" >> "$report_file"
     echo -e "\nRelatório HTML gerado em: $report_file"
 }
-
 
 # --- INSTALAÇÃO AUTOMÁTICA DO JMETER ---
 if [ ! -d "$JMETER_DIR" ]; then
@@ -204,7 +158,6 @@ if [ ! -s "$CONTRACT_ADDRESS_FILE" ]; then
 fi
 CONTRACT_ADDRESS=$(<"$CONTRACT_ADDRESS_FILE")
 
-# Gera os dados de teste ANTES de iniciar o loop de execuções
 generate_caliper_style_accounts_csv
 
 # --- EXECUÇÃO EM LOOP ---
@@ -212,41 +165,42 @@ for (( i=1; i<=$NUM_REPETITIONS; i++ ))
 do
     echo -e "\n--- Iniciando Execução JMeter #$i de $NUM_REPETITIONS ---"
 
-    # Função para executar um round de teste e monitorá-lo
     run_test_and_monitor() {
         local JMX_FILE=$1
         local ROUND_NAME=$2
         local RUN_NUMBER=$3
-        local CSV_FILE_PATH=$4 # Caminho para o arquivo CSV específico do teste
+        local CSV_FILE_PATH=$4
 
         local JTL_FILE="$JMETER_RUNS_DIR/results_${ROUND_NAME,,}_run_${RUN_NUMBER}.jtl"
-        local DOCKER_STATS_LOG="$JMETER_RUNS_DIR/docker_stats_${ROUND_NAME,,}_run_${RUN_NUMBER}.log"
+        # O caminho do log do Docker é passado para a API
+        local DOCKER_STATS_LOG_PATH="$JMETER_RUNS_DIR/docker_stats_${ROUND_NAME,,}_run_${RUN_NUMBER}.log"
 
         echo -e "\n--- Executando Round: $ROUND_NAME (Execução #${RUN_NUMBER}) ---"
-        rm -f "$DOCKER_STATS_LOG"; touch "$DOCKER_STATS_LOG"
 
-        # Inicia o monitoramento do Docker em segundo plano
-        MONITOR_PID=
-        ( while true; do docker stats --no-stream --format "{{.Name}},{{.CPUPerc}},{{.MemUsage}}" "${DOCKER_CONTAINERS[@]}" >> "$DOCKER_STATS_LOG"; sleep 1; done ) & MONITOR_PID=$!
-        
-        # AJUSTE: Passa o caminho do CSV específico para o JMeter
-        # Seus arquivos JMX devem estar configurados para usar a propriedade 'csvDataFile'
+        # 1. Inicia o monitoramento via API
+        echo "Iniciando monitoramento remoto na API..."
+        curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\", \"logPath\": \"${DOCKER_STATS_LOG_PATH}\"}" \
+            http://${API_HOST}:3000/monitor/start
+
+        # 2. Executa o teste JMeter
         echo "Usando arquivo de dados: $CSV_FILE_PATH"
         "$JMETER_HOME/jmeter" -n -t "$JMX_FILE" -l "$JTL_FILE" \
             -JcontractAddress="$CONTRACT_ADDRESS" \
-            -JcsvDataFile="$CSV_FILE_PATH"
+            -JcsvDataFile="$CSV_FILE_PATH" \
+            -JapiHost="$API_HOST"
         
-        # Para o monitoramento
-        kill "$MONITOR_PID"
+        # 3. Para o monitoramento via API
+        echo "Parando monitoramento remoto na API..."
+        curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\"}" \
+            http://${API_HOST}:3000/monitor/stop
     }
 
-    # Executa cada round separadamente, passando o arquivo CSV correto
-    # O teste de 'query' usa o mesmo CSV que o 'open', pois consulta as contas recém-criadas.
     run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts.csv"
     run_test_and_monitor "$JMX_QUERY" "Query" "$i" "$JMETER_RUNS_DIR/open_accounts.csv"
     run_test_and_monitor "$JMX_TRANSFER" "Transfer" "$i" "$JMETER_RUNS_DIR/transfer_accounts.csv"
 
-    # Gera o relatório HTML no final da execução
     generate_html_report "$i"
 done
 
