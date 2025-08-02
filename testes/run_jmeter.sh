@@ -5,8 +5,7 @@ JMETER_VERSION="5.6.3"
 JMETER_DIR="apache-jmeter-${JMETER_VERSION}"
 JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
 CONTRACT_ADDRESS_FILE="contract_address.txt"
-# MODIFICAÇÃO: Adicione o IP da máquina onde a API (e a rede Besu) está a ser executada
-API_HOST="10.126.1.248" # Mude para o IP da VM se o JMeter estiver noutra máquina
+API_HOST="10.126.1.248" # <--- MUDE PARA O IP DA SUA VM ONDE A API ESTÁ A CORRER
 
 # Configurações para o Java
 JAVA_DIR_NAME="jdk-21.0.7"
@@ -63,6 +62,7 @@ generate_caliper_style_accounts_csv() {
     if [ $? -ne 0 ]; then echo "Erro: Falha ao gerar contas com Node.js."; exit 1; fi
     echo "source_account,target_account" > "$transfer_csv"
     for ((i=0; i<$TRANSFER_TX_NUMBER; i++)); do
+        # MODIFICAÇÃO: Removidos os caracteres de escape '\' antes de '$'
         source_acc=$(shuf -n 1 "$accounts_file")
         target_acc=$(shuf -n 1 "$accounts_file")
         while [[ "$source_acc" == "$target_acc" ]]; do
@@ -76,33 +76,7 @@ generate_caliper_style_accounts_csv() {
 parse_jtl_for_html() {
     local jtl_file=$1
     if [ ! -f "$jtl_file" ]; then echo "0 0 N/A N/A N/A N/A N/A"; return; fi
-    awk 'BEGIN { FS=","; min_lat=999999999; max_lat=0; total_lat=0; count_s=0; count_f=0; first_ts=0; last_ts=0; total_req=0; }
-    NR > 1 {
-        ts=$1; el=$2; sc=$8;
-        if(first_ts==0){first_ts=ts}
-        last_ts=ts;
-        total_req++;
-        if(sc=="true"){
-            count_s++;
-            total_lat+=el;
-            if(el<min_lat){min_lat=el}
-            if(el>max_lat){max_lat=el}
-        } else { count_f++ }
-    } END {
-        if(count_s>0){
-            avg_lat_s=sprintf("%.2f", (total_lat/count_s)/1000);
-            min_lat_s=sprintf("%.2f", min_lat/1000);
-            max_lat_s=sprintf("%.2f", max_lat/1000);
-        } else {avg_lat_s="N/A";min_lat_s="N/A";max_lat_s="N/A"}
-        dur_s="N/A";
-        if(first_ts>0 && last_ts>0){ dur_ms=last_ts-first_ts; if(dur_ms>0){dur_s=sprintf("%.2f", dur_ms/1000)}else{dur_s="0.00"} }
-        s_rate="N/A"; tps="N/A";
-        if(dur_s!="N/A" && dur_s > 0){
-            s_rate=sprintf("%.2f", total_req/dur_s);
-            if(count_s>0){tps=sprintf("%.2f", count_s/dur_s)}else{tps="0.00"}
-        }
-        printf "%d %d %s %s %s %s %s", count_s, count_f, s_rate, max_lat_s, min_lat_s, avg_lat_s, tps;
-    }' "$jtl_file"
+    awk 'BEGIN { FS=","; min_lat=999999999; max_lat=0; total_lat=0; count_s=0; count_f=0; first_ts=0; last_ts=0; total_req=0; } NR > 1 { ts=$1; el=$2; sc=$8; if(first_ts==0){first_ts=ts} last_ts=ts; total_req++; if(sc=="true"){ count_s++; total_lat+=el; if(el<min_lat){min_lat=el} if(el>max_lat){max_lat=el} } else { count_f++ } } END { if(count_s>0){ avg_lat_s=sprintf("%.2f", (total_lat/count_s)/1000); min_lat_s=sprintf("%.2f", min_lat/1000); max_lat_s=sprintf("%.2f", max_lat/1000); } else {avg_lat_s="N/A";min_lat_s="N/A";max_lat_s="N/A"} dur_s="N/A"; if(first_ts>0 && last_ts>0){ dur_ms=last_ts-first_ts; if(dur_ms>0){dur_s=sprintf("%.2f", dur_ms/1000)}else{dur_s="0.00"} } s_rate="N/A"; tps="N/A"; if(dur_s!="N/A" && dur_s > 0){ s_rate=sprintf("%.2f", total_req/dur_s); if(count_s>0){tps=sprintf("%.2f", count_s/dur_s)}else{tps="0.00"} } printf "%d %d %s %s %s %s %s", count_s, count_f, s_rate, max_lat_s, min_lat_s, avg_lat_s, tps; }' "$jtl_file"
 }
 
 generate_html_report() {
@@ -127,7 +101,6 @@ EOF
         jtl_file="$JMETER_RUNS_DIR/results_${round_name,,}_run_${run_number}.jtl"; docker_stats_log="$JMETER_RUNS_DIR/docker_stats_${round_name,,}_run_${run_number}.log"; perf_data=($(parse_jtl_for_html "$jtl_file"))
         echo "<div style=\"border-bottom: 1px solid #d9d9d9; padding-bottom: 10px;\" id=\"${round_name,,}\"><h2>Benchmark round: ${round_name}</h2><h3>Performance metrics for ${round_name}</h3><table style=\"min-width: 100%;\"><tr><th>Name</th><th>Succ</th><th>Fail</th><th>Send Rate (TPS)</th><th>Max Latency (s)</th><th>Min Latency (s)</th><th>Avg Latency (s)</th><th>Throughput (TPS)</th></tr><tr><td>${round_name}</td><td>${perf_data[0]}</td><td>${perf_data[1]}</td><td>${perf_data[2]}</td><td>${perf_data[3]}</td><td>${perf_data[4]}</td><td>${perf_data[5]}</td><td>${perf_data[6]}</td></tr></table>" >> "$report_file"
         echo "<h3>Resource utilization for ${round_name}</h3><h4>Resource monitor: docker</h4><table style=\"min-width: 100%;\"><tr><th>Name</th><th>CPU%(max)</th><th>CPU%(avg)</th><th>Memory(max) [MB]</th><th>Memory(avg) [MB]</th></tr>" >> "$report_file"
-        # O ficheiro de log do docker agora é criado pela API, mas a lógica de parsing continua a mesma
         for container in node1 node2 node3 node4 node5 node6; do
             if [ ! -f "$docker_stats_log" ]; then continue; fi
             CPU_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $2}' | sed 's/%//'); MEM_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $3}' | sed -e 's/MiB.*//' -e 's/GiB.*/ \* 1024/' | bc)
@@ -172,7 +145,6 @@ do
         local CSV_FILE_PATH=$4
 
         local JTL_FILE="$JMETER_RUNS_DIR/results_${ROUND_NAME,,}_run_${RUN_NUMBER}.jtl"
-        # O caminho do log do Docker é passado para a API
         local DOCKER_STATS_LOG_PATH="$JMETER_RUNS_DIR/docker_stats_${ROUND_NAME,,}_run_${RUN_NUMBER}.log"
 
         echo -e "\n--- Executando Round: $ROUND_NAME (Execução #${RUN_NUMBER}) ---"
@@ -180,7 +152,7 @@ do
         # 1. Inicia o monitoramento via API
         echo "Iniciando monitoramento remoto na API..."
         curl -s -X POST -H "Content-Type: application/json" \
-            -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\", \"logPath\": \"${DOCKER_STATS_LOG_PATH}\"}" \
+            -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\"}" \
             http://${API_HOST}:3000/monitor/start
 
         # 2. Executa o teste JMeter
@@ -195,6 +167,10 @@ do
         curl -s -X POST -H "Content-Type: application/json" \
             -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\"}" \
             http://${API_HOST}:3000/monitor/stop
+
+        # 4. Descarrega o ficheiro de log da API
+        echo "A descarregar o ficheiro de log de monitoramento..."
+        curl -s -o "$DOCKER_STATS_LOG_PATH" "http://${API_HOST}:3000/monitor/logs/${ROUND_NAME}/${RUN_NUMBER}"
     }
 
     run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts.csv"

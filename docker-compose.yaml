@@ -7,10 +7,10 @@ services:
     command: '--data-path=/opt/besu/data --genesis-file=/opt/besu/genesis.json --rpc-http-enabled
       --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM --host-allowlist="*"
       --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled --rpc-http-host=0.0.0.0
-      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8645  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9545
+      --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT --data-storage-format=BONSAI    --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8645  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9545
       --p2p-port=30303 --rpc-http-port=8545 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-
+      --tx-pool-limit-by-account-percentage=0.5
       '
     volumes:
     - ./genesis.json:/opt/besu/genesis.json
@@ -23,10 +23,10 @@ services:
       --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
       --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
       --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8646  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9546
+      --data-storage-format=BONSAI    --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8646  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9546
       --p2p-port=30304 --rpc-http-port=8546 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-
+      --tx-pool-limit-by-account-percentage=0.5
       '
     volumes:
     - ./genesis.json:/opt/besu/genesis.json
@@ -39,10 +39,10 @@ services:
       --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
       --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
       --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8647  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9547
+      --data-storage-format=BONSAI    --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8647  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9547
       --p2p-port=30305 --rpc-http-port=8547 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-
+      --tx-pool-limit-by-account-percentage=0.5
       '
     volumes:
     - ./genesis.json:/opt/besu/genesis.json
@@ -55,10 +55,10 @@ services:
       --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
       --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
       --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8648  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9548
+      --data-storage-format=BONSAI    --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8648  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9548
       --p2p-port=30306 --rpc-http-port=8548 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-
+      --tx-pool-limit-by-account-percentage=0.5
       '
     volumes:
     - ./genesis.json:/opt/besu/genesis.json
@@ -71,10 +71,10 @@ services:
       --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
       --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
       --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8649  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9549
+      --data-storage-format=BONSAI    --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8649  --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9549
       --p2p-port=30307 --rpc-http-port=8549 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-
+      --tx-pool-limit-by-account-percentage=0.5
       '
     volumes:
     - ./genesis.json:/opt/besu/genesis.json
@@ -87,11 +87,11 @@ services:
       --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT,ADMIN,EEA,WEB3,TRACE,DEBUG,TXPOOL,PERM
       --host-allowlist="*" --rpc-http-cors-origins="all" --profile=ENTERPRISE --metrics-enabled
       --rpc-http-host=0.0.0.0 --rpc-ws-api=EEA,WEB3,ETH,NET,TRACE,DEBUG,ADMIN,TXPOOL,PERM,QBFT
-      --data-storage-format=BONSAI  --tx-pool-min-gas-price=0  --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8650
+      --data-storage-format=BONSAI    --min-gas-price=0  --rpc-ws-enabled=true  --rpc-ws-port=8650
       --tx-pool-limit-by-account-percentage=1  --tx-pool-max-size=4096  --metrics-port=9550
       --p2p-port=30308 --rpc-http-port=8550 --permissions-nodes-config-file=/opt/besu/data/permissions_config.toml
       --permissions-accounts-config-file=/opt/besu/data/permissions_config.toml
-
+      --tx-pool-limit-by-account-percentage=0.5
       '
     volumes:
     - ./genesis.json:/opt/besu/genesis.json

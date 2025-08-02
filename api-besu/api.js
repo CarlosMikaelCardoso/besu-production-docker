@@ -1,8 +1,9 @@
 const express = require('express');
 const { ethers } = require('ethers');
-const { spawn } = require('child_process'); // Módulo para executar processos externos
-const fs = require('fs'); // Módulo para interagir com o sistema de ficheiros
-const path = require('path'); // Módulo para lidar com caminhos de ficheiros
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os'); // Módulo para obter o diretório temporário do sistema
 
 // --- Configuração da Aplicação e Conexão ---
 const app = express();
@@ -14,7 +15,6 @@ const BESU_RPC_URL = process.env.BESU_RPC_URL || "http://localhost:8545";
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
-// Validação para garantir que as variáveis essenciais foram definidas
 if (!DEPLOYER_PRIVATE_KEY || !CONTRACT_ADDRESS) {
     console.error("Erro Crítico: As variáveis de ambiente DEPLOYER_PRIVATE_KEY e CONTRACT_ADDRESS são obrigatórias.");
     process.exit(1);
@@ -31,61 +31,50 @@ const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 let openTxCount = 1;
 
+// MODIFICAÇÃO: Gerenciamento manual de nonce para lidar com alta concorrência
+// Inicializa uma promessa que resolve para o próximo nonce pendente da conta do signer.
+let noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
+
 // --- Lógica de Monitoramento do Docker ---
 
 const monitoringProcesses = {};
 const DOCKER_CONTAINERS_TO_MONITOR = ["node1", "node2", "node3", "node4", "node5", "node6"];
+const LOG_DIR = path.join(os.tmpdir(), 'jmeter_docker_logs');
+if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+}
 
-/**
- * Endpoint para iniciar o monitoramento do Docker para um round de teste específico.
- */
 app.post('/monitor/start', (req, res) => {
-    const { roundName, runNumber, logPath } = req.body;
-    if (!roundName || !runNumber || !logPath) {
-        return res.status(400).json({ error: "Campos 'roundName', 'runNumber' e 'logPath' são obrigatórios." });
+    const { roundName, runNumber } = req.body;
+    if (!roundName || !runNumber) {
+        return res.status(400).json({ error: "Campos 'roundName' e 'runNumber' são obrigatórios." });
     }
 
     const runId = `${roundName}_run_${runNumber}`;
+    const logPath = path.join(LOG_DIR, `docker_stats_${runId}.log`);
+
     if (monitoringProcesses[runId]) {
         return res.status(409).json({ message: `O monitoramento para ${runId} já está em execução.` });
     }
 
     console.log(`Iniciando monitoramento para: ${runId}. A gravar em: ${logPath}`);
+    const logStream = fs.createWriteStream(logPath, { flags: 'w' });
 
-    // Garante que o diretório de logs existe
-    const dir = path.dirname(logPath);
-    if (!fs.existsSync(dir)){
-        fs.mkdirSync(dir, { recursive: true });
-    }
-
-    // Cria um stream para o ficheiro de log
-    const logStream = fs.createWriteStream(logPath, { flags: 'a' });
-
-    // Função que executa 'docker stats' e escreve no stream
     const getStats = () => {
         const monitorProcess = spawn('docker', [
             'stats', '--no-stream', '--format', '{{.Name}},{{.CPUPerc}},{{.MemUsage}}', ...DOCKER_CONTAINERS_TO_MONITOR
         ]);
-        
-        monitorProcess.stdout.pipe(logStream, { end: false }); // Não fecha o stream de escrita
-        monitorProcess.stderr.on('data', (data) => {
-            console.error(`Erro no docker stats para ${runId}: ${data}`);
-        });
+        monitorProcess.stdout.pipe(logStream, { end: false });
+        monitorProcess.stderr.on('data', (data) => console.error(`Erro no docker stats para ${runId}: ${data}`));
     };
     
-    // Executa a função imediatamente e depois a cada segundo
     getStats();
     const intervalId = setInterval(getStats, 1000);
-
-    // Armazena o ID do intervalo para poder pará-lo mais tarde
-    monitoringProcesses[runId] = { interval: intervalId, stream: logStream };
+    monitoringProcesses[runId] = { interval: intervalId, stream: logStream, path: logPath };
 
     res.status(202).json({ message: `Monitoramento para ${runId} iniciado.` });
 });
 
-/**
- * Endpoint para parar o monitoramento do Docker.
- */
 app.post('/monitor/stop', (req, res) => {
     const { roundName, runNumber } = req.body;
     if (!roundName || !runNumber) {
@@ -97,12 +86,24 @@ app.post('/monitor/stop', (req, res) => {
 
     if (processInfo) {
         console.log(`Parando monitoramento para: ${runId}`);
-        clearInterval(processInfo.interval); // Para o loop de recolha
-        processInfo.stream.end(); // Fecha o stream do ficheiro
+        clearInterval(processInfo.interval);
+        processInfo.stream.end();
         delete monitoringProcesses[runId];
         res.status(200).json({ message: `Monitoramento para ${runId} parado.` });
     } else {
         res.status(404).json({ message: `Nenhum processo de monitoramento encontrado para ${runId}.` });
+    }
+});
+
+app.get('/monitor/logs/:roundName/:runNumber', (req, res) => {
+    const { roundName, runNumber } = req.params;
+    const runId = `${roundName}_run_${runNumber}`;
+    const logPath = path.join(LOG_DIR, `docker_stats_${runId}.log`);
+
+    if (fs.existsSync(logPath)) {
+        res.sendFile(logPath);
+    } else {
+        res.status(404).send('Ficheiro de log não encontrado.');
     }
 });
 
@@ -114,10 +115,15 @@ app.post('/open', async (req, res) => {
     if (!accountId || amount === undefined) {
         return res.status(400).json({ error: "Campos 'accountId' e 'amount' são obrigatórios." });
     }
-
     try {
-        console.log(`Recebido pedido 'open' para a conta: ${accountId}. Submetendo...`);
-        const tx = await contract.open(accountId, amount);
+        // MODIFICAÇÃO: Obtém o próximo nonce de forma atômica
+        const nonce = await noncePromise;
+        // Prepara a promessa para a próxima transação, incrementando o nonce
+        noncePromise = Promise.resolve(nonce + 1);
+
+        console.log(`Recebido pedido 'open' para a conta: ${accountId}. Submetendo com nonce ${nonce}...`);
+        // Envia a transação com o nonce explícito
+        const tx = await contract.open(accountId, amount, { nonce });
         const receipt = await tx.wait();
         console.log(`Transação 'open' #${openTxCount} confirmada com sucesso! Hash: ${receipt.hash}`);
         openTxCount++;
@@ -125,9 +131,13 @@ app.post('/open', async (req, res) => {
             message: `Transação 'open' confirmada na blockchain.`,
             transactionHash: receipt.hash
         });
-
     } catch (error) {
         console.error(`Erro ao processar transação 'open' para a conta ${accountId}:`, error);
+        // Em caso de erro, reinicia a contagem de nonce para evitar bloqueios
+        if (error.code === 'NONCE_EXPIRED' || error.code === 'REPLACEMENT_UNDERPRICED') {
+            noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
+            console.error("Nonce dessincronizado. A reiniciar a contagem de nonce.");
+        }
         res.status(500).json({ error: "Falha ao confirmar a transação 'open'.", details: error.message });
     }
 });
@@ -137,19 +147,28 @@ app.post('/transfer', async (req, res) => {
     if (!from || !to || amount === undefined) {
         return res.status(400).json({ error: "Os campos 'from', 'to' e 'amount' são obrigatórios." });
     }
-
     try {
-        console.log(`Recebido pedido 'transfer' de ${from} para ${to}. Submetendo...`);
-        const tx = await contract.transfer(from, to, amount);
+        // MODIFICAÇÃO: Obtém o próximo nonce de forma atômica
+        const nonce = await noncePromise;
+        // Prepara a promessa para a próxima transação, incrementando o nonce
+        noncePromise = Promise.resolve(nonce + 1);
+
+        console.log(`Recebido pedido 'transfer' de ${from} para ${to}. Submetendo com nonce ${nonce}...`);
+        // Envia a transação com o nonce explícito
+        const tx = await contract.transfer(from, to, amount, { nonce });
         const receipt = await tx.wait();
         console.log(`Transação 'transfer' confirmada com sucesso! Hash: ${receipt.hash}`);
         res.status(200).json({
             message: "Transação 'transfer' confirmada na blockchain.",
             transactionHash: receipt.hash
         });
-
     } catch (error) {
         console.error(`Erro ao processar transação 'transfer' de ${from} para ${to}:`, error);
+        // Em caso de erro, reinicia a contagem de nonce para evitar bloqueios
+        if (error.code === 'NONCE_EXPIRED' || error.code === 'REPLACEMENT_UNDERPRICED') {
+            noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
+            console.error("Nonce dessincronizado. A reiniciar a contagem de nonce.");
+        }
         res.status(500).json({ error: "Falha ao confirmar a transação 'transfer'.", details: error.message });
     }
 });
