@@ -5,7 +5,12 @@ JMETER_VERSION="5.6.3"
 JMETER_DIR="apache-jmeter-${JMETER_VERSION}"
 JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
 CONTRACT_ADDRESS_FILE="contract_address.txt"
-export JAVA_HOME=../jdk-21.0.7
+# Configurações para o Java
+JAVA_DIR_NAME="jdk-21.0.7"
+JAVA_TAR_GZ="jdk-21.0.7_linux-x64_bin.tar.gz"
+JAVA_URL="https://download.oracle.com/java/21/archive/${JAVA_TAR_GZ}"
+# Define JAVA_HOME com base no diretório pai do script
+export JAVA_HOME="$(pwd)/../${JAVA_DIR_NAME}"
 
 # Caminhos para os planos de teste (JMX)
 JMX_OPEN="test_round1_open.jmx"
@@ -25,6 +30,38 @@ TRANSFER_TX_NUMBER=50 # Total de transações de transferência, igual ao config
 # Limpa o diretório de execuções anteriores e cria um novo
 rm -rf "$JMETER_RUNS_DIR"
 mkdir -p "$JMETER_RUNS_DIR"
+
+check_and_install_java() {
+    echo "--- Verificando instalação do Java ---"
+    # Verifica se o diretório do Java e o executável existem
+    if [ ! -d "$JAVA_HOME" ] || [ ! -f "${JAVA_HOME}/bin/java" ]; then
+        echo "Java não encontrado. Baixando e instalando JDK ${JAVA_DIR_NAME}..."
+        
+        # Garante que o wget está instalado
+        if ! command -v wget &> /dev/null; then
+            echo "Erro: 'wget' não está instalado. Por favor, instale o wget para continuar."
+            exit 1
+        fi
+
+        # Baixa e extrai o JDK no diretório pai (../)
+        wget -q --show-progress -O "${JAVA_TAR_GZ}" "${JAVA_URL}"
+        if [ $? -ne 0 ]; then
+            echo "Erro: Falha ao baixar o Java. Verifique a URL e sua conexão."
+            exit 1
+        fi
+        
+        # Extrai para o diretório pai, onde o JAVA_HOME espera encontrá-lo
+        tar -xzf "${JAVA_TAR_GZ}" -C "$(dirname "$JAVA_HOME")"
+        rm "${JAVA_TAR_Z}" # Limpa o arquivo baixado
+
+        echo "Java ${JAVA_DIR_NAME} instalado com sucesso."
+    else
+        echo "Java já está instalado em ${JAVA_HOME}"
+    fi
+    
+    # Garante que o Java correto está no PATH para a execução do script
+    export PATH="${JAVA_HOME}/bin:$PATH"
+}
 
 # --- AJUSTE: Função para gerar contas no estilo do Caliper ---
 # Esta função replica a lógica do simple-state.js do Caliper para gerar
@@ -157,6 +194,8 @@ else
     echo "JMeter já está instalado."
 fi
 export JMETER_HOME="$(pwd)/${JMETER_DIR}/bin"
+
+check_and_install_java
 
 # --- LÓGICA PRINCIPAL ---
 if [ ! -s "$CONTRACT_ADDRESS_FILE" ]; then
