@@ -6,11 +6,27 @@ const app = express();
 const port = 3000;
 app.use(express.json());
 
-const BESU_RPC_URL = "http://localhost:8545";
-const DEPLOYER_PRIVATE_KEY = "0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63";
+/*
+AJUSTE: As configurações críticas (URL do RPC, chave privada e endereço do contrato)
+são carregadas a partir de variáveis de ambiente. Isso evita expor dados
+sensíveis no código-fonte e facilita a execução em diferentes ambientes.
+*/
 
-// !!! IMPORTANTE: SUBSTITUA ESTE ENDEREÇO PELO ENDEREÇO REAL DO SEU CONTRATO IMPLANTADO !!!
-const CONTRACT_ADDRESS = "0x664D6EbAbbD5cf656eD07A509AFfBC81f9615741"; 
+// Exporta as variáveis de ambiente necessárias para a configuração do Besu.
+// export BESU_RPC_URL="http://localhost:8545"
+// export DEPLOYER_PRIVATE_KEY="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
+// export CONTRACT_ADDRESS="0x42699A7612A82f1d9C36148af9C77354759b210b"
+
+const BESU_RPC_URL = process.env.BESU_RPC_URL || "http://localhost:8545";
+const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+
+// Validação para garantir que as variáveis essenciais foram definidas no ambiente
+if (!DEPLOYER_PRIVATE_KEY || !CONTRACT_ADDRESS) {
+    console.error("Erro Crítico: As variáveis de ambiente DEPLOYER_PRIVATE_KEY e CONTRACT_ADDRESS são obrigatórias.");
+    process.exit(1); // Encerra a aplicação se as variáveis não estiverem configuradas
+}
+
 const CONTRACT_ABI = [
     { "constant": false, "inputs": [ { "internalType": "string", "name": "acc_from", "type": "string" }, { "internalType": "string", "name": "acc_to", "type": "string" }, { "internalType": "int256", "name": "amount", "type": "int256" } ], "name": "transfer", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
     { "constant": true, "inputs": [ { "internalType": "string", "name": "acc_id", "type": "string" } ], "name": "query", "outputs": [ { "internalType": "int256", "name": "amount", "type": "int256" } ], "stateMutability": "view", "type": "function" },
@@ -21,10 +37,11 @@ const CONTRACT_ABI = [
 const provider = new ethers.JsonRpcProvider(BESU_RPC_URL);
 const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+let count = 1;
 
 // --- Endpoints da API ---
 
-// MODIFICAÇÃO: O endpoint agora é 'async' para poder usar 'await'.
+// O endpoint agora é 'async' para poder usar 'await'.
 app.post('/open', async (req, res) => {
     const { accountId, amount } = req.body;
     if (!accountId || amount === undefined) {
@@ -33,19 +50,13 @@ app.post('/open', async (req, res) => {
 
     try {
         console.log(`Recebido pedido 'open' para a conta: ${accountId}. Submetendo para a blockchain...`);
-        
-        // 1. Submete a transação para a rede
         const tx = await contract.open(accountId, amount);
-        
-        // 2. Espera a transação ser minerada e confirmada (aqui é a grande mudança)
-        const receipt = await tx.wait();
-        
-        console.log(`Transação 'open' concluída com sucesso! Hash: ${receipt.hash}`);
-        
-        // 3. Retorna 200 OK com o hash da transação apenas após a confirmação.
-        res.status(200).json({ 
-            message: "Transação 'open' confirmada na blockchain.",
-            transactionHash: receipt.hash 
+        const receipt = await tx.wait(); // Espera a transação ser confirmada
+        console.log(`Transação 'open' ${count}, concluída com sucesso! Hash: ${receipt.hash}`);
+        count++;
+        res.status(200).json({
+            message: `Transação 'open' confirmada na blockchain.`,
+            transactionHash: receipt.hash
         });
 
     } catch (error) {
@@ -54,7 +65,7 @@ app.post('/open', async (req, res) => {
     }
 });
 
-// MODIFICAÇÃO: O endpoint agora é 'async' para poder usar 'await'.
+// O endpoint agora é 'async' para poder usar 'await'.
 app.post('/transfer', async (req, res) => {
     const { from, to, amount } = req.body;
     if (!from || !to || amount === undefined) {
@@ -63,19 +74,12 @@ app.post('/transfer', async (req, res) => {
 
     try {
         console.log(`Recebido pedido 'transfer' de ${from} para ${to}. Submetendo para a blockchain...`);
-
-        // 1. Submete a transação
         const tx = await contract.transfer(from, to, amount);
-        
-        // 2. Espera pela confirmação
-        const receipt = await tx.wait();
-
+        const receipt = await tx.wait(); // Espera a transação ser confirmada
         console.log(`Transação 'transfer' concluída com sucesso! Hash: ${receipt.hash}`);
-
-        // 3. Retorna 200 OK apenas após a confirmação
-        res.status(200).json({ 
+        res.status(200).json({
             message: "Transação 'transfer' confirmada na blockchain.",
-            transactionHash: receipt.hash 
+            transactionHash: receipt.hash
         });
 
     } catch (error) {
@@ -96,6 +100,7 @@ app.get('/query/:accountId', async (req, res) => {
 
 // --- Iniciar o Servidor ---
 app.listen(port, () => {
-    console.log(`Servidor da API a correr em http://10.126.1.238:${port}`);
+    console.log(`Servidor da API a correr em http://localhost:${port}`);
     console.log("Modo de operação: Síncrono (espera a confirmação da transação).");
+    console.log(`Usando contrato no endereço: ${CONTRACT_ADDRESS}`);
 });
