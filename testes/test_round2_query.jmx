@@ -11,7 +11,7 @@
     <hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Round 2: Query">
         <intProp name="ThreadGroup.num_threads">5</intProp>
-        <intProp name="ThreadGroup.ramp_time">5</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -33,8 +33,7 @@
         </CSVDataSet>
         <hashTree/>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request - Query">
-          <!-- MODIFICAÇÃO: Usa uma propriedade para o host da API para maior flexibilidade -->
-          <stringProp name="HTTPSampler.domain">${__P(apiHost, 10.126.1.248)}</stringProp>
+          <stringProp name="HTTPSampler.domain">${__P(apiHost, localhost)}</stringProp>
           <stringProp name="HTTPSampler.port">3000</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
           <stringProp name="HTTPSampler.path">/query/${accountId}</stringProp>
@@ -46,11 +45,7 @@
           </elementProp>
         </HTTPSamplerProxy>
         <hashTree/>
-        <UniformRandomTimer guiclass="UniformRandomTimerGui" testclass="UniformRandomTimer" testname="Uniform Random Timer">
-          <stringProp name="ConstantTimer.delay">500</stringProp>
-          <stringProp name="RandomTimer.range">1000.0</stringProp>
-        </UniformRandomTimer>
-        <hashTree/>
+        <!-- MODIFICAÇÃO: O UniformRandomTimer foi removido para permitir o débito máximo de leituras -->
       </hashTree>
     </hashTree>
   </hashTree>
