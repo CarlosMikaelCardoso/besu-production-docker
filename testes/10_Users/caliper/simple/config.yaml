@@ -51,6 +51,7 @@ monitors:
   resource:
   - module: docker
     options:
+      url: "http://10.126.1.232:2375" # <--- ADICIONE ESTA LINHA
       interval: 5
       cpuUsageNormalization: false
       containers:
