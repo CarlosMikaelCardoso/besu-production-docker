@@ -72,9 +72,8 @@ if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 
-// MODIFICAÇÃO: Substitua completamente a sua função /monitor/start por esta.
-// Esta função agora usa o método de streaming do Docker, igual ao Caliper,
-// para calcular a média de uso de CPU entre intervalos, em vez de picos instantâneos.
+// MODIFICAÇÃO: api_load_balancer.js
+// A função foi atualizada para extrair e gravar dados de Rede (Leitura/Escrita) e Disco (Leitura/Escrita).
 app.post('/monitor/start', (req, res) => {
     const { roundName, runNumber } = req.body;
     const runId = `${roundName}_run_${runNumber}`;
@@ -92,32 +91,55 @@ app.post('/monitor/start', (req, res) => {
         return new Promise((resolve, reject) => {
             container.stats({ stream: true }, (err, stream) => {
                 if (err) return reject(err);
-                
-                let previousCpu = 0;
-                let previousSystem = 0;
 
                 stream.on('data', (chunk) => {
                     const stats = JSON.parse(chunk.toString());
-                    
-                    // Cálculo de CPU similar ao do Docker/Caliper
+
+                    // --- Cálculo de CPU ---
                     const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
                     const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
                     const cpuCount = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage.percpu_usage.length;
-                    
                     let cpuPercent = 0.0;
                     if (systemDelta > 0.0 && cpuDelta > 0.0) {
                         cpuPercent = (cpuDelta / systemDelta) * cpuCount * 100.0;
                     }
-                    
-                    const memUsage = (stats.memory_stats.usage / (1024 * 1024)).toFixed(2); // Memória em MB
-                    
-                    const logLine = `${stats.name.substring(1)},${cpuPercent.toFixed(2)}%,${memUsage}MiB\n`;
+
+                    // --- Leitura de Memória ---
+                    const memUsage = (stats.memory_stats.usage / (1024 * 1024)).toFixed(2); // Em MB
+
+                    // --- Novas Métricas: Rede e Disco ---
+                    let netRx = 0, netTx = 0, diskRead = 0, diskWrite = 0;
+
+                    // Rede (soma todas as interfaces)
+                    if (stats.networks) {
+                        Object.values(stats.networks).forEach(net => {
+                            netRx += net.rx_bytes;
+                            netTx += net.tx_bytes;
+                        });
+                    }
+
+                    // Disco (soma operações de Leitura e Escrita)
+                    if (stats.blkio_stats && stats.blkio_stats.io_service_bytes_recursive) {
+                        stats.blkio_stats.io_service_bytes_recursive.forEach(io => {
+                            if (io.op === 'Read') diskRead += io.value;
+                            if (io.op === 'Write') diskWrite += io.value;
+                        });
+                    }
+
+                    // Converte para KB para melhor legibilidade
+                    const netRxKB = (netRx / 1024).toFixed(2);
+                    const netTxKB = (netTx / 1024).toFixed(2);
+                    const diskReadKB = (diskRead / 1024).toFixed(2);
+                    const diskWriteKB = (diskWrite / 1024).toFixed(2);
+
+                    // --- Linha de Log Atualizada ---
+                    const logLine = `${stats.name.substring(1)},${cpuPercent.toFixed(2)}%,${memUsage}MiB,${netRxKB}KB,${netTxKB}KB,${diskReadKB}KB,${diskWriteKB}KB\n`;
                     logStream.write(logLine);
                 });
-                
+
                 stream.on('end', resolve);
                 stream.on('error', reject);
-                
+
                 monitoringProcesses[runId] = monitoringProcesses[runId] || {};
                 monitoringProcesses[runId][containerName] = stream;
             });

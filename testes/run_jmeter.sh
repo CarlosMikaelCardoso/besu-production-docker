@@ -7,21 +7,38 @@ JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERS
 CONTRACT_ADDRESS_FILE="contract_address.txt"
 API_HOST="10.126.1.232" # <--- MUDE PARA O IP DA SUA VM ONDE A API ESTÁ A CORRER
 
+# === NOVA CONFIGURAÇÃO PARA EXECUÇÕES MÚLTIPLAS E SELEÇÃO DE USUÁRIOS ===
+# Número de usuários para o teste (5, 10, 25, 50). Padrão para 5 se nenhum argumento for fornecido.
+NUM_USERS=${1:-5}
+# Número de repetições. Padrão para 1 se nenhum segundo argumento for fornecido.
+NUM_REPETITIONS=${2:-1}
+
+# Validação do número de usuários
+case $NUM_USERS in
+    5|10|25|50)
+        echo "Número de usuários selecionado: $NUM_USERS"
+        ;;
+    *)
+        echo "Erro: Número de usuários inválido. Escolha entre 5, 10, 25, ou 50."
+        exit 1
+        ;;
+esac
+
 # Configurações para o Java
 JAVA_DIR_NAME="jdk-21.0.7"
 JAVA_TAR_GZ="jdk-21.0.7_linux-x64_bin.tar.gz"
 JAVA_URL="https://download.oracle.com/java/21/archive/${JAVA_TAR_GZ}"
 export JAVA_HOME="$(pwd)/../${JAVA_DIR_NAME}"
 
-# Caminhos para os planos de teste (JMX)
-JMX_OPEN="test_round1_open.jmx"
-JMX_QUERY="test_round2_query.jmx"
-JMX_TRANSFER="test_round3_transfer.jmx"
+# Caminhos para os planos de teste (JMX) - Agora dinâmicos
+JMX_DIR="${NUM_USERS}_Users/Jmeter"
+JMX_OPEN="${JMX_DIR}/test_round1_open.jmx"
+JMX_QUERY="${JMX_DIR}/test_round2_query.jmx"
+JMX_TRANSFER="${JMX_DIR}/test_round3_transfer.jmx"
 
-# === CONFIGURAÇÃO PARA EXECUÇÕES E TESTES ===
-NUM_REPETITIONS=${1:-1}
+# Diretório para os resultados do JMeter - Agora dinâmico
 TESTE_DIR="$(pwd)"
-JMETER_RUNS_DIR="$TESTE_DIR/jmeter_runs"
+JMETER_RUNS_DIR="$TESTE_DIR/jmeter_runs_${NUM_USERS}_users"
 NUMBER_OF_ACCOUNTS=1000
 TRANSFER_TX_NUMBER=50
 
@@ -96,7 +113,7 @@ parse_jtl_for_html() {
             min_lat_s=sprintf("%.2f", min_lat/1000);
             max_lat_s=sprintf("%.2f", max_lat/1000);
         } else {avg_lat_s="N/A";min_lat_s="N/A";max_lat_s="N/A"}
-        
+
         dur_s="0.00"; s_rate="N/A"; tps="N/A";
         # Calcula a duração desde o início da primeira transação até ao fim da última
         dur_ms = (last_ts + last_el) - first_ts;
@@ -114,6 +131,9 @@ parse_jtl_for_html() {
     }' "$jtl_file"
 }
 
+# MODIFICAÇÃO: run_jmeter.sh
+# A função foi atualizada para ler as novas métricas (Rede e Disco) do log
+# e adicioná-las à tabela de utilização de recursos no relatório HTML.
 generate_html_report() {
     local run_number=$1
     local report_file="$JMETER_RUNS_DIR/jmeter_docker_report_run_${run_number}.html"
@@ -135,11 +155,33 @@ EOF
     for round_name in "${rounds[@]}"; do
         jtl_file="$JMETER_RUNS_DIR/results_${round_name,,}_run_${run_number}.jtl"; docker_stats_log="$JMETER_RUNS_DIR/docker_stats_${round_name,,}_run_${run_number}.log"; perf_data=($(parse_jtl_for_html "$jtl_file"))
         echo "<div style=\"border-bottom: 1px solid #d9d9d9; padding-bottom: 10px;\" id=\"${round_name,,}\"><h2>Benchmark round: ${round_name}</h2><h3>Performance metrics for ${round_name}</h3><table style=\"min-width: 100%;\"><tr><th>Name</th><th>Succ</th><th>Fail</th><th>Send Rate (TPS)</th><th>Max Latency (s)</th><th>Min Latency (s)</th><th>Avg Latency (s)</th><th>Throughput (TPS)</th></tr><tr><td>${round_name}</td><td>${perf_data[0]}</td><td>${perf_data[1]}</td><td>${perf_data[2]}</td><td>${perf_data[3]}</td><td>${perf_data[4]}</td><td>${perf_data[5]}</td><td>${perf_data[6]}</td></tr></table>" >> "$report_file"
-        echo "<h3>Resource utilization for ${round_name}</h3><h4>Resource monitor: docker</h4><table style=\"min-width: 100%;\"><tr><th>Name</th><th>CPU%(max)</th><th>CPU%(avg)</th><th>Memory(max) [MB]</th><th>Memory(avg) [MB]</th></tr>" >> "$report_file"
+        echo "<h3>Resource utilization for ${round_name}</h3><h4>Resource monitor: docker</h4><table style=\"min-width: 100%;\"><tr><th>Name</th><th>CPU%(max)</th><th>CPU%(avg)</th><th>Memory(max) [MB]</th><th>Memory(avg) [MB]</th><th>Net I/O(max) [KB]</th><th>Net I/O(avg) [KB]</th><th>Disk I/O(max) [KB]</th><th>Disk I/O(avg) [KB]</th></tr>" >> "$report_file"
         for container in node1 node2 node3 node4 node5 node6; do
             if [ ! -f "$docker_stats_log" ]; then continue; fi
-            CPU_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $2}' | sed 's/%//'); MEM_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $3}' | sed -e 's/MiB.*//' -e 's/GiB.*/ \* 1024/' | bc)
-            if [ -n "$CPU_DATA" ]; then MAX_CPU=$(echo "$CPU_DATA"|sort -nr|head -n 1); AVG_CPU=$(echo "$CPU_DATA"|awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }'); MAX_MEM=$(echo "$MEM_DATA"|sort -nr|head -n 1); AVG_MEM=$(echo "$MEM_DATA"|awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }'); LC_NUMERIC=C echo "<tr><td>/${container}</td><td>${MAX_CPU}</td><td>${AVG_CPU}</td><td>${MAX_MEM}</td><td>${AVG_MEM}</td></tr>" >> "$report_file"; fi
+            
+            # Extrai todas as métricas
+            CPU_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $2}' | sed 's/%//')
+            MEM_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $3}' | sed -e 's/MiB.*//' -e 's/GiB.*/ \* 1024/' | bc)
+            NET_RX_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $4}' | sed 's/KB//')
+            NET_TX_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $5}' | sed 's/KB//')
+            DISK_R_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $6}' | sed 's/KB//')
+            DISK_W_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $7}' | sed 's/KB//')
+
+            if [ -n "$CPU_DATA" ]; then
+                # Calcula Max e Avg para cada métrica
+                MAX_CPU=$(echo "$CPU_DATA" | sort -nr | head -n 1)
+                AVG_CPU=$(echo "$CPU_DATA" | awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                MAX_MEM=$(echo "$MEM_DATA" | sort -nr | head -n 1)
+                AVG_MEM=$(echo "$MEM_DATA" | awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                
+                # Combina dados de rede e disco para calcular totais
+                MAX_NET=$(paste <(echo "$NET_RX_DATA") <(echo "$NET_TX_DATA") | awk '{print $1+$2}' | sort -nr | head -n 1)
+                AVG_NET=$(paste <(echo "$NET_RX_DATA") <(echo "$NET_TX_DATA") | awk '{ total += ($1+$2) } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                MAX_DISK=$(paste <(echo "$DISK_R_DATA") <(echo "$DISK_W_DATA") | awk '{print $1+$2}' | sort -nr | head -n 1)
+                AVG_DISK=$(paste <(echo "$DISK_R_DATA") <(echo "$DISK_W_DATA") | awk '{ total += ($1+$2) } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                
+                LC_NUMERIC=C echo "<tr><td>/${container}</td><td>${MAX_CPU}</td><td>${AVG_CPU}</td><td>${MAX_MEM}</td><td>${AVG_MEM}</td><td>${MAX_NET}</td><td>${AVG_NET}</td><td>${MAX_DISK}</td><td>${AVG_DISK}</td></tr>" >> "$report_file"
+            fi
         done; echo "</table></div>" >> "$report_file"
     done; echo "</div></main></body></html>" >> "$report_file"
     echo -e "\nRelatório HTML gerado em: $report_file"
@@ -195,11 +237,11 @@ do
             -JcontractAddress="$CONTRACT_ADDRESS" \
             -JcsvDataFile="$CSV_FILE_PATH" \
             -JapiHost="$API_HOST"
-        
+
         echo "A aguardar a finalização da escrita dos logs do JMeter..."
         local start_time=$(date +%s)
         local expected_lines=$((EXPECTED_SAMPLES + 1))
-        
+
         while true; do
             if [ -f "$JTL_FILE" ] && [ $(wc -l < "$JTL_FILE") -ge $expected_lines ]; then
                 echo "Ficheiro JTL completo encontrado."

@@ -1,8 +1,24 @@
 #!/bin/bash
 
 # --- CONFIGURAÇÕES ---
+# Número de usuários para o teste (5, 10, 25, 50). Padrão para 5 se nenhum argumento for fornecido.
+NUM_USERS=${1:-5}
+# Número de repetições. Padrão para 1 se nenhum segundo argumento for fornecido.
+NUM_REPETITIONS=${2:-1}
+
+# Validação do número de usuários
+case $NUM_USERS in
+    5|10|25|50)
+        echo "Número de usuários selecionado: $NUM_USERS"
+        ;;
+    *)
+        echo "Erro: Número de usuários inválido. Escolha entre 5, 10, 25, ou 50."
+        exit 1
+        ;;
+esac
+
 # Caminho para o arquivo de configuração do benchmark do Caliper
-CALIPER_BENCHCONFIG="$(pwd)5_Users/caliper/simple/config.yaml"
+CALIPER_BENCHCONFIG="$(pwd)/${NUM_USERS}_Users/caliper/simple/config.yaml"
 # Define o diretório base do projeto para caminhos absolutos
 CALIPER_NETWORKCONFIG="$(pwd)/../meu-contrato/networkconfig.json"
 # Workspace do Caliper
@@ -10,18 +26,15 @@ CALIPER_WORKSPACE="."
 # Arquivo para salvar o endereço do contrato
 CONTRACT_ADDRESS_FILE="../besu-production-docker/testes/contract_address.txt"
 
-# === NOVA CONFIGURAÇÃO PARA EXECUÇÕES MÚLTIPLAS ===
-# Número de repetições. Padrão para 1 se nenhum argumento for fornecido.
-NUM_REPETITIONS=${1:-1}
 # Diretório para logs individuais de cada execução do Caliper
 TESTE_DIR="$(pwd)"
-CALIPER_RUNS_DIR="$TESTE_DIR/caliper_runs"
+CALIPER_RUNS_DIR="$TESTE_DIR/caliper_runs_${NUM_USERS}_users"
 
 # Limpa o diretório de execuções anteriores e cria um novo
 rm -rf "$CALIPER_RUNS_DIR"
 mkdir -p "$CALIPER_RUNS_DIR"
 
-echo "Iniciando a execução do Caliper por $NUM_REPETITIONS vezes."
+echo "Iniciando a execução do Caliper com $NUM_USERS usuários por $NUM_REPETITIONS vez(es)."
 echo "Resultados detalhados de cada execução serão salvos em: $CALIPER_RUNS_DIR"
 echo "As métricas de recursos (CPU, Memória) estarão no relatório HTML gerado pelo Caliper."
 
