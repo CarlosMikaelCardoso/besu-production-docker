@@ -34,9 +34,12 @@ check_and_install_java() {
     if [ ! -d "$JAVA_HOME" ] || [ ! -f "${JAVA_HOME}/bin/java" ]; then
         echo "Java não encontrado. Baixando e instalando JDK ${JAVA_DIR_NAME}..."
         if ! command -v wget &> /dev/null; then echo "Erro: 'wget' não está instalado."; exit 1; fi
+        if ! command -v wget &> /dev/null; then echo "Erro: 'wget' não está instalado."; exit 1; fi
         wget -q --show-progress -O "${JAVA_TAR_GZ}" "${JAVA_URL}"
         if [ $? -ne 0 ]; then echo "Erro: Falha ao baixar o Java."; exit 1; fi
+        if [ $? -ne 0 ]; then echo "Erro: Falha ao baixar o Java."; exit 1; fi
         tar -xzf "${JAVA_TAR_GZ}" -C "$(dirname "$JAVA_HOME")"
+        rm "${JAVA_TAR_GZ}"
         rm "${JAVA_TAR_GZ}"
         echo "Java ${JAVA_DIR_NAME} instalado com sucesso."
     else
@@ -53,8 +56,10 @@ generate_caliper_style_accounts_csv() {
     node -e "
         const DICTIONARY = 'abcdefghijklmnopqrstuvwxyz';
         function get26Num(n) { let result = ''; while(n >= 0) { result = DICTIONARY.charAt(n % DICTIONARY.length) + result; n = Math.floor(n / DICTIONARY.length) - 1; } return result; }
+        function get26Num(n) { let result = ''; while(n >= 0) { result = DICTIONARY.charAt(n % DICTIONARY.length) + result; n = Math.floor(n / DICTIONARY.length) - 1; } return result; }
         const fs = require('fs');
         const accounts = [];
+        for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) { accounts.push('user' + get26Num(i)); }
         for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) { accounts.push('user' + get26Num(i)); }
         fs.writeFileSync('${open_csv}', 'accountId\n' + accounts.join('\n'));
         fs.writeFileSync('${accounts_file}', accounts.join('\n'));
@@ -76,11 +81,12 @@ generate_caliper_style_accounts_csv() {
 parse_jtl_for_html() {
     local jtl_file=$1
     if [ ! -f "$jtl_file" ]; then echo "0 0 N/A N/A N/A N/A N/A"; return; fi
-    awk 'BEGIN { FS=","; min_lat=999999999; max_lat=0; total_lat=0; count_s=0; count_f=0; first_ts=0; last_ts=0; total_req=0; }
+    awk 'BEGIN { FS=","; min_lat=999999999; max_lat=0; total_lat=0; count_s=0; count_f=0; first_ts=0; last_ts=0; total_req=0; last_el=0; }
     NR > 1 {
         ts=$1; el=$2; sc=$8;
         if(first_ts==0){first_ts=ts}
         last_ts=ts;
+        last_el=el; # Guarda o tempo da última transação
         total_req++;
         if(sc=="true"){
             count_s++;
@@ -94,10 +100,17 @@ parse_jtl_for_html() {
             min_lat_s=sprintf("%.2f", min_lat/1000);
             max_lat_s=sprintf("%.2f", max_lat/1000);
         } else {avg_lat_s="N/A";min_lat_s="N/A";max_lat_s="N/A"}
-        dur_s="N/A";
-        if(first_ts>0 && last_ts>0){ dur_ms=last_ts-first_ts; if(dur_ms>0){dur_s=sprintf("%.2f", dur_ms/1000)}else{dur_s="0.00"} }
-        s_rate="N/A"; tps="N/A";
-        if(dur_s!="N/A" && dur_s > 0){
+
+        dur_s="0.00"; s_rate="N/A"; tps="N/A";
+        # Calcula a duração desde o início da primeira transação até ao fim da última
+        dur_ms = (last_ts + last_el) - first_ts;
+
+        if(dur_ms <= 0 && count_s > 0){
+            dur_ms = 1; # Evita divisão por zero, assume duração mínima de 1ms
+        }
+
+        if(dur_ms > 0){
+            dur_s=sprintf("%.2f", dur_ms/1000);
             s_rate=sprintf("%.2f", total_req/dur_s);
             if(count_s>0){tps=sprintf("%.2f", count_s/dur_s)}else{tps="0.00"}
         }
@@ -130,8 +143,30 @@ EOF
         # O ficheiro de log do docker agora é criado pela API, mas a lógica de parsing continua a mesma
         for container in node1 node2 node3 node4 node5 node6; do
             if [ ! -f "$docker_stats_log" ]; then continue; fi
-            CPU_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $2}' | sed 's/%//'); MEM_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $3}' | sed -e 's/MiB.*//' -e 's/GiB.*/ \* 1024/' | bc)
-            if [ -n "$CPU_DATA" ]; then MAX_CPU=$(echo "$CPU_DATA"|sort -nr|head -n 1); AVG_CPU=$(echo "$CPU_DATA"|awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }'); MAX_MEM=$(echo "$MEM_DATA"|sort -nr|head -n 1); AVG_MEM=$(echo "$MEM_DATA"|awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }'); LC_NUMERIC=C echo "<tr><td>/${container}</td><td>${MAX_CPU}</td><td>${AVG_CPU}</td><td>${MAX_MEM}</td><td>${AVG_MEM}</td></tr>" >> "$report_file"; fi
+            
+            # Extrai todas as métricas
+            CPU_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $2}' | sed 's/%//')
+            MEM_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $3}' | sed -e 's/MiB.*//' -e 's/GiB.*/ \* 1024/' | bc)
+            NET_RX_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $4}' | sed 's/KB//')
+            NET_TX_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $5}' | sed 's/KB//')
+            DISK_R_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $6}' | sed 's/KB//')
+            DISK_W_DATA=$(grep "$container" "$docker_stats_log" | awk -F, '{print $7}' | sed 's/KB//')
+
+            if [ -n "$CPU_DATA" ]; then
+                # Calcula Max e Avg para cada métrica
+                MAX_CPU=$(echo "$CPU_DATA" | sort -nr | head -n 1)
+                AVG_CPU=$(echo "$CPU_DATA" | awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                MAX_MEM=$(echo "$MEM_DATA" | sort -nr | head -n 1)
+                AVG_MEM=$(echo "$MEM_DATA" | awk '{ total += $1 } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                
+                # Combina dados de rede e disco para calcular totais
+                MAX_NET=$(paste <(echo "$NET_RX_DATA") <(echo "$NET_TX_DATA") | awk '{print $1+$2}' | sort -nr | head -n 1)
+                AVG_NET=$(paste <(echo "$NET_RX_DATA") <(echo "$NET_TX_DATA") | awk '{ total += ($1+$2) } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                MAX_DISK=$(paste <(echo "$DISK_R_DATA") <(echo "$DISK_W_DATA") | awk '{print $1+$2}' | sort -nr | head -n 1)
+                AVG_DISK=$(paste <(echo "$DISK_R_DATA") <(echo "$DISK_W_DATA") | awk '{ total += ($1+$2) } END { if (NR > 0) printf "%.2f", total/NR; else print "0.00" }')
+                
+                LC_NUMERIC=C echo "<tr><td>/${container}</td><td>${MAX_CPU}</td><td>${AVG_CPU}</td><td>${MAX_MEM}</td><td>${AVG_MEM}</td><td>${MAX_NET}</td><td>${AVG_NET}</td><td>${MAX_DISK}</td><td>${AVG_DISK}</td></tr>" >> "$report_file"
+            fi
         done; echo "</table></div>" >> "$report_file"
     done; echo "</div></main></body></html>" >> "$report_file"
     echo -e "\nRelatório HTML gerado em: $report_file"

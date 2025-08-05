@@ -10,7 +10,7 @@ test:
     performance with simple account opening & querying transactions.
 
   workers:
-    number: 5
+    number: 50
   rounds:
     - label: open
       description: >-
@@ -51,7 +51,8 @@ monitors:
   resource:
   - module: docker
     options:
+      url: "http://10.126.1.232:2375" # <--- ADICIONE ESTA LINHA
       interval: 5
-      cpuUsageNormalization: true
+      cpuUsageNormalization: false
       containers:
-      - all
+        - all
