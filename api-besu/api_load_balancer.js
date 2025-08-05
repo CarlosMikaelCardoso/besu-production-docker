@@ -2,6 +2,8 @@
 // export BESU_RPC_URL="http://localhost:8545"
 // export DEPLOYER_PRIVATE_KEY="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
 // export CONTRACT_ADDRESS="0x42699A7612A82f1d9C36148af9C77354759b210b"
+const Docker = require('dockerode');
+const docker = new Docker(); // Conecta-se ao Docker via socket padrão
 const express = require('express');
 const { ethers } = require('ethers');
 const { spawn } = require('child_process');
@@ -70,32 +72,75 @@ if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 
+// MODIFICAÇÃO: Substitua completamente a sua função /monitor/start por esta.
+// Esta função agora usa o método de streaming do Docker, igual ao Caliper,
+// para calcular a média de uso de CPU entre intervalos, em vez de picos instantâneos.
 app.post('/monitor/start', (req, res) => {
     const { roundName, runNumber } = req.body;
     const runId = `${roundName}_run_${runNumber}`;
     const logPath = path.join(LOG_DIR, `docker_stats_${runId}.log`);
-    if (monitoringProcesses[runId]) return res.status(409).json({ message: `O monitoramento para ${runId} já está em execução.` });
-    console.log(`Iniciando monitoramento para: ${runId}. A gravar em: ${logPath}`);
+
+    if (monitoringProcesses[runId]) {
+        return res.status(409).json({ message: `O monitoramento para ${runId} já está em execução.` });
+    }
+
+    console.log(`Iniciando monitoramento (método Caliper) para: ${runId}. A gravar em: ${logPath}`);
     const logStream = fs.createWriteStream(logPath, { flags: 'w' });
-    const getStats = () => {
-        const monitorProcess = spawn('docker', ['stats', '--no-stream', '--format', '{{.Name}},{{.CPUPerc}},{{.MemUsage}}', ...DOCKER_CONTAINERS_TO_MONITOR]);
-        monitorProcess.stdout.pipe(logStream, { end: false });
-        monitorProcess.stderr.on('data', (data) => console.error(`Erro no docker stats para ${runId}: ${data}`));
-    };
-    getStats();
-    const intervalId = setInterval(getStats, 1000);
-    monitoringProcesses[runId] = { interval: intervalId, stream: logStream, path: logPath };
+
+    const streams = DOCKER_CONTAINERS_TO_MONITOR.map(containerName => {
+        const container = docker.getContainer(containerName);
+        return new Promise((resolve, reject) => {
+            container.stats({ stream: true }, (err, stream) => {
+                if (err) return reject(err);
+                
+                let previousCpu = 0;
+                let previousSystem = 0;
+
+                stream.on('data', (chunk) => {
+                    const stats = JSON.parse(chunk.toString());
+                    
+                    // Cálculo de CPU similar ao do Docker/Caliper
+                    const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+                    const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+                    const cpuCount = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage.percpu_usage.length;
+                    
+                    let cpuPercent = 0.0;
+                    if (systemDelta > 0.0 && cpuDelta > 0.0) {
+                        cpuPercent = (cpuDelta / systemDelta) * cpuCount * 100.0;
+                    }
+                    
+                    const memUsage = (stats.memory_stats.usage / (1024 * 1024)).toFixed(2); // Memória em MB
+                    
+                    const logLine = `${stats.name.substring(1)},${cpuPercent.toFixed(2)}%,${memUsage}MiB\n`;
+                    logStream.write(logLine);
+                });
+                
+                stream.on('end', resolve);
+                stream.on('error', reject);
+                
+                monitoringProcesses[runId] = monitoringProcesses[runId] || {};
+                monitoringProcesses[runId][containerName] = stream;
+            });
+        });
+    });
+
+    Promise.all(streams).catch(err => console.error(`Erro ao iniciar stream de stats: ${err}`));
+
     res.status(202).json({ message: `Monitoramento para ${runId} iniciado.` });
 });
 
+// MODIFICAÇÃO: Substitua também a função /monitor/stop para fechar os streams
 app.post('/monitor/stop', (req, res) => {
     const { roundName, runNumber } = req.body;
     const runId = `${roundName}_run_${runNumber}`;
     const processInfo = monitoringProcesses[runId];
     if (processInfo) {
         console.log(`Parando monitoramento para: ${runId}`);
-        clearInterval(processInfo.interval);
-        processInfo.stream.end();
+        for (const containerName in processInfo) {
+            if (processInfo[containerName] && typeof processInfo[containerName].destroy === 'function') {
+                processInfo[containerName].destroy(); // Fecha o stream
+            }
+        }
         delete monitoringProcesses[runId];
         res.status(200).json({ message: `Monitoramento para ${runId} parado.` });
     } else {

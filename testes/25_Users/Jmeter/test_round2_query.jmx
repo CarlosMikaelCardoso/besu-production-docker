@@ -10,12 +10,12 @@
     </TestPlan>
     <hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Round 2: Query">
-        <intProp name="ThreadGroup.num_threads">5</intProp>
-        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <intProp name="ThreadGroup.num_threads">25</intProp>
+        <intProp name="ThreadGroup.ramp_time">5</intProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
-          <stringProp name="LoopController.loops">200</stringProp>
+          <stringProp name="LoopController.loops">40</stringProp>
           <boolProp name="LoopController.continue_forever">false</boolProp>
         </elementProp>
       </ThreadGroup>
@@ -32,6 +32,16 @@
           <stringProp name="shareMode">shareMode.all</stringProp>
         </CSVDataSet>
         <hashTree/>
+        <!-- MODIFICAÇÃO: Adicionado ConstantThroughputTimer para controlar a taxa de TPS -->
+        <ConstantThroughputTimer guiclass="TestBeanGUI" testclass="ConstantThroughputTimer" testname="Constant Throughput Timer">
+          <intProp name="calcMode">2</intProp>
+          <doubleProp>
+            <name>throughput</name>
+            <value>6000.0</value>
+            <savedValue>0.0</savedValue>
+          </doubleProp>
+        </ConstantThroughputTimer>
+        <hashTree/>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP Request - Query">
           <stringProp name="HTTPSampler.domain">${__P(apiHost, localhost)}</stringProp>
           <stringProp name="HTTPSampler.port">3000</stringProp>
@@ -45,7 +55,6 @@
           </elementProp>
         </HTTPSamplerProxy>
         <hashTree/>
-        <!-- MODIFICAÇÃO: O UniformRandomTimer foi removido para permitir o débito máximo de leituras -->
       </hashTree>
     </hashTree>
   </hashTree>

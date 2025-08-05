@@ -2,7 +2,7 @@
 
 # --- CONFIGURAÇÕES ---
 # Caminho para o arquivo de configuração do benchmark do Caliper
-CALIPER_BENCHCONFIG="$(pwd)/simple/config.yaml"
+CALIPER_BENCHCONFIG="$(pwd)5_Users/caliper/simple/config.yaml"
 # Define o diretório base do projeto para caminhos absolutos
 CALIPER_NETWORKCONFIG="$(pwd)/../meu-contrato/networkconfig.json"
 # Workspace do Caliper

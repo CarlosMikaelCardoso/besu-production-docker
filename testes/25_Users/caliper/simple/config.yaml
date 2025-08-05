@@ -10,7 +10,7 @@ test:
     performance with simple account opening & querying transactions.
 
   workers:
-    number: 5
+    number: 25
   rounds:
     - label: open
       description: >-
@@ -52,6 +52,6 @@ monitors:
   - module: docker
     options:
       interval: 5
-      cpuUsageNormalization: true
+      cpuUsageNormalization: false
       containers:
-      - all
+        - all
