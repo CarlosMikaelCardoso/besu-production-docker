@@ -5,8 +5,30 @@ JMETER_VERSION="5.6.3"
 JMETER_DIR="apache-jmeter-${JMETER_VERSION}"
 JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
 CONTRACT_ADDRESS_FILE="contract_address.txt"
-# MODIFICAÇÃO: Adicione o IP da máquina onde a API (e a rede Besu) está a ser executada
-API_HOST="10.126.1.232" # Mude para o IP da VM se o JMeter estiver noutra máquina
+API_HOST="10.126.1.232" # <--- MUDE PARA O IP DA SUA VM ONDE A API ESTÁ A CORRER
+
+# === NOVA CONFIGURAÇÃO PARA EXECUÇÕES MÚLTIPLAS E SELEÇÃO DE USUÁRIOS ===
+# Número de usuários para o teste (5, 10, 25, 50). Padrão para 5 se nenhum argumento for fornecido.
+NUM_USERS=${1:-5}
+# Número de repetições. Padrão para 1 se nenhum segundo argumento for fornecido.
+NUM_REPETITIONS=${2:-1}
+
+# Validação do número de usuários
+case $NUM_USERS in
+    5|10|25|50)
+        echo "Número de usuários selecionado: $NUM_USERS"
+        ;;
+    *)
+        echo "Erro: Número de usuários inválido. Escolha entre 5, 10, 25, ou 50."
+        exit 1
+        ;;
+esac
+
+# MODIFICAÇÃO: O número de contas e transações agora é calculado dinamicamente
+BASE_ACCOUNTS=1000
+BASE_TRANSFER_TX=50
+NUMBER_OF_ACCOUNTS=$((BASE_ACCOUNTS * NUM_REPETITIONS))
+TRANSFER_TX_NUMBER=$((BASE_TRANSFER_TX * NUM_REPETITIONS))
 
 # Configurações para o Java
 JAVA_DIR_NAME="jdk-21.0.7"
@@ -14,17 +36,15 @@ JAVA_TAR_GZ="jdk-21.0.7_linux-x64_bin.tar.gz"
 JAVA_URL="https://download.oracle.com/java/21/archive/${JAVA_TAR_GZ}"
 export JAVA_HOME="$(pwd)/../${JAVA_DIR_NAME}"
 
-# Caminhos para os planos de teste (JMX)
-JMX_OPEN="test_round1_open.jmx"
-JMX_QUERY="test_round2_query.jmx"
-JMX_TRANSFER="test_round3_transfer.jmx"
+# Caminhos para os planos de teste (JMX) - Agora dinâmicos
+JMX_DIR="${NUM_USERS}_Users/Jmeter"
+JMX_OPEN="${JMX_DIR}/test_round1_open.jmx"
+JMX_QUERY="${JMX_DIR}/test_round2_query.jmx"
+JMX_TRANSFER="${JMX_DIR}/test_round3_transfer.jmx"
 
-# === CONFIGURAÇÃO PARA EXECUÇÕES E TESTES ===
-NUM_REPETITIONS=${1:-1}
+# Diretório para os resultados do JMeter - Agora dinâmico
 TESTE_DIR="$(pwd)"
-JMETER_RUNS_DIR="$TESTE_DIR/jmeter_runs"
-NUMBER_OF_ACCOUNTS=1000
-TRANSFER_TX_NUMBER=50
+JMETER_RUNS_DIR="$TESTE_DIR/jmeter_runs_${NUM_USERS}_users"
 
 rm -rf "$JMETER_RUNS_DIR"
 mkdir -p "$JMETER_RUNS_DIR"
@@ -34,12 +54,9 @@ check_and_install_java() {
     if [ ! -d "$JAVA_HOME" ] || [ ! -f "${JAVA_HOME}/bin/java" ]; then
         echo "Java não encontrado. Baixando e instalando JDK ${JAVA_DIR_NAME}..."
         if ! command -v wget &> /dev/null; then echo "Erro: 'wget' não está instalado."; exit 1; fi
-        if ! command -v wget &> /dev/null; then echo "Erro: 'wget' não está instalado."; exit 1; fi
         wget -q --show-progress -O "${JAVA_TAR_GZ}" "${JAVA_URL}"
         if [ $? -ne 0 ]; then echo "Erro: Falha ao baixar o Java."; exit 1; fi
-        if [ $? -ne 0 ]; then echo "Erro: Falha ao baixar o Java."; exit 1; fi
         tar -xzf "${JAVA_TAR_GZ}" -C "$(dirname "$JAVA_HOME")"
-        rm "${JAVA_TAR_GZ}"
         rm "${JAVA_TAR_GZ}"
         echo "Java ${JAVA_DIR_NAME} instalado com sucesso."
     else
@@ -56,11 +73,9 @@ generate_caliper_style_accounts_csv() {
     node -e "
         const DICTIONARY = 'abcdefghijklmnopqrstuvwxyz';
         function get26Num(n) { let result = ''; while(n >= 0) { result = DICTIONARY.charAt(n % DICTIONARY.length) + result; n = Math.floor(n / DICTIONARY.length) - 1; } return result; }
-        function get26Num(n) { let result = ''; while(n >= 0) { result = DICTIONARY.charAt(n % DICTIONARY.length) + result; n = Math.floor(n / DICTIONARY.length) - 1; } return result; }
         const fs = require('fs');
         const accounts = [];
-        for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) { accounts.push('user' + get26Num(i)); }
-        for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) { accounts.push('user' + get26Num(i)); }
+        for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) { accounts.push('userJmeter' + get26Num(i)); }
         fs.writeFileSync('${open_csv}', 'accountId\n' + accounts.join('\n'));
         fs.writeFileSync('${accounts_file}', accounts.join('\n'));
         console.log('${NUMBER_OF_ACCOUNTS} contas geradas para os testes open e query.');
@@ -78,6 +93,8 @@ generate_caliper_style_accounts_csv() {
     echo "${TRANSFER_TX_NUMBER} pares de transferência gerados."
 }
 
+# MODIFICAÇÃO: A função foi ajustada para calcular o TPS de forma mais robusta,
+# usando o tempo de conclusão da última transação para garantir que a duração nunca seja zero.
 parse_jtl_for_html() {
     local jtl_file=$1
     if [ ! -f "$jtl_file" ]; then echo "0 0 N/A N/A N/A N/A N/A"; return; fi
@@ -118,6 +135,9 @@ parse_jtl_for_html() {
     }' "$jtl_file"
 }
 
+# MODIFICAÇÃO: run_jmeter.sh
+# A função foi atualizada para ler as novas métricas (Rede e Disco) do log
+# e adicioná-las à tabela de utilização de recursos no relatório HTML.
 generate_html_report() {
     local run_number=$1
     local report_file="$JMETER_RUNS_DIR/jmeter_docker_report_run_${run_number}.html"
@@ -139,8 +159,7 @@ EOF
     for round_name in "${rounds[@]}"; do
         jtl_file="$JMETER_RUNS_DIR/results_${round_name,,}_run_${run_number}.jtl"; docker_stats_log="$JMETER_RUNS_DIR/docker_stats_${round_name,,}_run_${run_number}.log"; perf_data=($(parse_jtl_for_html "$jtl_file"))
         echo "<div style=\"border-bottom: 1px solid #d9d9d9; padding-bottom: 10px;\" id=\"${round_name,,}\"><h2>Benchmark round: ${round_name}</h2><h3>Performance metrics for ${round_name}</h3><table style=\"min-width: 100%;\"><tr><th>Name</th><th>Succ</th><th>Fail</th><th>Send Rate (TPS)</th><th>Max Latency (s)</th><th>Min Latency (s)</th><th>Avg Latency (s)</th><th>Throughput (TPS)</th></tr><tr><td>${round_name}</td><td>${perf_data[0]}</td><td>${perf_data[1]}</td><td>${perf_data[2]}</td><td>${perf_data[3]}</td><td>${perf_data[4]}</td><td>${perf_data[5]}</td><td>${perf_data[6]}</td></tr></table>" >> "$report_file"
-        echo "<h3>Resource utilization for ${round_name}</h3><h4>Resource monitor: docker</h4><table style=\"min-width: 100%;\"><tr><th>Name</th><th>CPU%(max)</th><th>CPU%(avg)</th><th>Memory(max) [MB]</th><th>Memory(avg) [MB]</th></tr>" >> "$report_file"
-        # O ficheiro de log do docker agora é criado pela API, mas a lógica de parsing continua a mesma
+        echo "<h3>Resource utilization for ${round_name}</h3><h4>Resource monitor: docker</h4><table style=\"min-width: 100%;\"><tr><th>Name</th><th>CPU%(max)</th><th>CPU%(avg)</th><th>Memory(max) [MB]</th><th>Memory(avg) [MB]</th><th>Net I/O(max) [KB]</th><th>Net I/O(avg) [KB]</th><th>Disk I/O(max) [KB]</th><th>Disk I/O(avg) [KB]</th></tr>" >> "$report_file"
         for container in node1 node2 node3 node4 node5 node6; do
             if [ ! -f "$docker_stats_log" ]; then continue; fi
             
@@ -205,38 +224,58 @@ do
         local ROUND_NAME=$2
         local RUN_NUMBER=$3
         local CSV_FILE_PATH=$4
+        local EXPECTED_SAMPLES=$5
 
         local JTL_FILE="$JMETER_RUNS_DIR/results_${ROUND_NAME,,}_run_${RUN_NUMBER}.jtl"
-        # O caminho do log do Docker é passado para a API
         local DOCKER_STATS_LOG_PATH="$JMETER_RUNS_DIR/docker_stats_${ROUND_NAME,,}_run_${RUN_NUMBER}.log"
 
         echo -e "\n--- Executando Round: $ROUND_NAME (Execução #${RUN_NUMBER}) ---"
 
-        # 1. Inicia o monitoramento via API
         echo "Iniciando monitoramento remoto na API..."
         curl -s -X POST -H "Content-Type: application/json" \
-            -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\", \"logPath\": \"${DOCKER_STATS_LOG_PATH}\"}" \
+            -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\"}" \
             http://${API_HOST}:3000/monitor/start
 
-        # 2. Executa o teste JMeter
         echo "Usando arquivo de dados: $CSV_FILE_PATH"
         "$JMETER_HOME/jmeter" -n -t "$JMX_FILE" -l "$JTL_FILE" \
             -JcontractAddress="$CONTRACT_ADDRESS" \
             -JcsvDataFile="$CSV_FILE_PATH" \
             -JapiHost="$API_HOST"
-        
-        # 3. Para o monitoramento via API
+
+        echo "A aguardar a finalização da escrita dos logs do JMeter..."
+        local start_time=$(date +%s)
+        local expected_lines=$((EXPECTED_SAMPLES + 1))
+
+        while true; do
+            if [ -f "$JTL_FILE" ] && [ $(wc -l < "$JTL_FILE") -ge $expected_lines ]; then
+                echo "Ficheiro JTL completo encontrado."
+                break
+            fi
+            local current_time=$(date +%s)
+            if [ $((current_time - start_time)) -gt 30 ]; then
+                echo "Aviso: Timeout à espera do ficheiro JTL. O relatório pode estar incompleto."
+                break
+            fi
+            sleep 1
+        done
+
         echo "Parando monitoramento remoto na API..."
         curl -s -X POST -H "Content-Type: application/json" \
             -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\"}" \
             http://${API_HOST}:3000/monitor/stop
+
+        echo "A descarregar o ficheiro de log de monitoramento..."
+        curl -s -o "$DOCKER_STATS_LOG_PATH" "http://${API_HOST}:3000/monitor/logs/${ROUND_NAME}/${RUN_NUMBER}"
     }
 
-    run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts.csv"
-    run_test_and_monitor "$JMX_QUERY" "Query" "$i" "$JMETER_RUNS_DIR/open_accounts.csv"
-    run_test_and_monitor "$JMX_TRANSFER" "Transfer" "$i" "$JMETER_RUNS_DIR/transfer_accounts.csv"
+    # MODIFICAÇÃO: As chamadas agora passam as variáveis com os totais corretos
+    run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" "$NUMBER_OF_ACCOUNTS"
+    run_test_and_monitor "$JMX_QUERY" "Query" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" "$NUMBER_OF_ACCOUNTS"
+    run_test_and_monitor "$JMX_TRANSFER" "Transfer" "$i" "$JMETER_RUNS_DIR/transfer_accounts.csv" "$TRANSFER_TX_NUMBER"
 
     generate_html_report "$i"
 done
+# MODIFICAÇÃO: A chamada ao script python agora passa o número da execução ($i)
+python3 generateGraphs.py "$JMETER_RUNS_DIR"
 
 echo -e "\nExecução do JMeter concluída!"

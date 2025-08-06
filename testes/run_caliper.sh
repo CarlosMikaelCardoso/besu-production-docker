@@ -2,7 +2,7 @@
 
 # --- CONFIGURAÇÕES ---
 NUM_USERS=${1:-5}
-NUM_REPETITIONS=${2:-1}
+NUM_REPETITIONS=${1:-1}
 
 # --- Adicione o IP da sua VM do Besu aqui ---
 export DOCKER_HOST="tcp://10.126.1.232:2375"
@@ -110,5 +110,7 @@ do
 done
 
 cd "$ORIGINAL_DIR"
+python3 generateGraphsCaliper.py "$CALIPER_RUNS_DIR" "$NUM_REPETITIONS"
+
 echo -e "\nExecução do Caliper concluída!"
 echo "Verifique os relatórios HTML gerados no diretório: $CALIPER_RUNS_DIR/"

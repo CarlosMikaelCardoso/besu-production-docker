@@ -4,6 +4,8 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const Docker = require('dockerode');
+const docker = new Docker(); // Conecta-se ao Docker via socket padrão
 
 // --- Configuração da Aplicação e Conexão ---
 const app = express();
@@ -45,32 +47,91 @@ if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 
+// MODIFICAÇÃO: A função foi atualizada para usar o método de streaming do Docker (via dockerode),
+// capturando CPU, Memória, Rede (Leitura/Escrita) e Disco (Leitura/Escrita).
 app.post('/monitor/start', (req, res) => {
     const { roundName, runNumber } = req.body;
     const runId = `${roundName}_run_${runNumber}`;
     const logPath = path.join(LOG_DIR, `docker_stats_${runId}.log`);
-    if (monitoringProcesses[runId]) return res.status(409).json({ message: `O monitoramento para ${runId} já está em execução.` });
-    console.log(`Iniciando monitoramento para: ${runId}. A gravar em: ${logPath}`);
+
+    if (monitoringProcesses[runId]) {
+        return res.status(409).json({ message: `O monitoramento para ${runId} já está em execução.` });
+    }
+
+    console.log(`Iniciando monitoramento (método Caliper) para: ${runId}. A gravar em: ${logPath}`);
     const logStream = fs.createWriteStream(logPath, { flags: 'w' });
-    const getStats = () => {
-        const monitorProcess = spawn('docker', ['stats', '--no-stream', '--format', '{{.Name}},{{.CPUPerc}},{{.MemUsage}}', ...DOCKER_CONTAINERS_TO_MONITOR]);
-        monitorProcess.stdout.pipe(logStream, { end: false });
-        monitorProcess.stderr.on('data', (data) => console.error(`Erro no docker stats para ${runId}: ${data}`));
-    };
-    getStats();
-    const intervalId = setInterval(getStats, 1000);
-    monitoringProcesses[runId] = { interval: intervalId, stream: logStream, path: logPath };
+
+    const streams = DOCKER_CONTAINERS_TO_MONITOR.map(containerName => {
+        const container = docker.getContainer(containerName);
+        return new Promise((resolve, reject) => {
+            container.stats({ stream: true }, (err, stream) => {
+                if (err) return reject(err);
+
+                stream.on('data', (chunk) => {
+                    const stats = JSON.parse(chunk.toString());
+
+                    // Cálculo de CPU
+                    const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+                    const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+                    const cpuCount = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage.percpu_usage.length;
+                    let cpuPercent = 0.0;
+                    if (systemDelta > 0.0 && cpuDelta > 0.0) {
+                        cpuPercent = (cpuDelta / systemDelta) * cpuCount * 100.0;
+                    }
+
+                    // Leitura de Memória
+                    const memUsage = (stats.memory_stats.usage / (1024 * 1024)).toFixed(2); // Em MB
+
+                    // Métricas de Rede e Disco
+                    let netRx = 0, netTx = 0, diskRead = 0, diskWrite = 0;
+                    if (stats.networks) {
+                        Object.values(stats.networks).forEach(net => {
+                            netRx += net.rx_bytes;
+                            netTx += net.tx_bytes;
+                        });
+                    }
+                    if (stats.blkio_stats && stats.blkio_stats.io_service_bytes_recursive) {
+                        stats.blkio_stats.io_service_bytes_recursive.forEach(io => {
+                            if (io.op === 'Read') diskRead += io.value;
+                            if (io.op === 'Write') diskWrite += io.value;
+                        });
+                    }
+                    const netRxKB = (netRx / 1024).toFixed(2);
+                    const netTxKB = (netTx / 1024).toFixed(2);
+                    const diskReadKB = (diskRead / 1024).toFixed(2);
+                    const diskWriteKB = (diskWrite / 1024).toFixed(2);
+
+                    // Linha de Log Atualizada
+                    const logLine = `${stats.name.substring(1)},${cpuPercent.toFixed(2)}%,${memUsage}MiB,${netRxKB}KB,${netTxKB}KB,${diskReadKB}KB,${diskWriteKB}KB\n`;
+                    logStream.write(logLine);
+                });
+
+                stream.on('end', resolve);
+                stream.on('error', reject);
+
+                monitoringProcesses[runId] = monitoringProcesses[runId] || {};
+                monitoringProcesses[runId][containerName] = stream;
+            });
+        });
+    });
+
+    Promise.all(streams).catch(err => console.error(`Erro ao iniciar stream de stats: ${err}`));
+
     res.status(202).json({ message: `Monitoramento para ${runId} iniciado.` });
 });
 
+// MODIFICAÇÃO: A função foi atualizada para fechar os streams de dados do dockerode corretamente.
 app.post('/monitor/stop', (req, res) => {
     const { roundName, runNumber } = req.body;
     const runId = `${roundName}_run_${runNumber}`;
     const processInfo = monitoringProcesses[runId];
     if (processInfo) {
         console.log(`Parando monitoramento para: ${runId}`);
-        clearInterval(processInfo.interval);
-        processInfo.stream.end();
+        for (const containerName in processInfo) {
+            if (processInfo[containerName] && typeof processInfo[containerName].destroy === 'function') {
+                processInfo[containerName].destroy(); // Fecha o stream
+            }
+        }
         delete monitoringProcesses[runId];
         res.status(200).json({ message: `Monitoramento para ${runId} parado.` });
     } else {
@@ -158,6 +219,10 @@ app.post('/open-async', async (req, res) => {
         const nonce = await noncePromise;
         noncePromise = Promise.resolve(nonce + 1);
         const txResponse = await contract.open(accountId, amount, { nonce });
+        
+        // --- LOG ADICIONADO AQUI ---
+        console.log(`(Async) Transação 'open' para a conta ${accountId} submetida. Hash: ${txResponse.hash}`);
+
         res.status(202).json({ message: `Transação 'open' aceite para processamento.`, transactionHash: txResponse.hash });
     } catch (error) {
         console.error(`(Async) Erro ao submeter transação 'open' para ${accountId}:`, error);
@@ -169,6 +234,7 @@ app.post('/open-async', async (req, res) => {
     }
 });
 
+// MODIFICAÇÃO: Adicionado console.log para feedback visual da submissão.
 app.post('/transfer-async', async (req, res) => {
     const { from, to, amount } = req.body;
     if (!from || !to || amount === undefined) {
@@ -178,6 +244,10 @@ app.post('/transfer-async', async (req, res) => {
         const nonce = await noncePromise;
         noncePromise = Promise.resolve(nonce + 1);
         const txResponse = await contract.transfer(from, to, amount, { nonce });
+
+        // --- LOG ADICIONADO AQUI ---
+        console.log(`(Async) Transação 'transfer' de ${from} para ${to} submetida. Hash: ${txResponse.hash}`);
+
         res.status(202).json({ message: "Transação 'transfer' aceite para processamento.", transactionHash: txResponse.hash });
     } catch (error) {
         console.error(`(Async) Erro ao submeter transação 'transfer' de ${from} para ${to}:`, error);
