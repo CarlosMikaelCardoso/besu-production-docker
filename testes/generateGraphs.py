@@ -168,7 +168,6 @@ def main():
             if not consolidated_jtl_df.empty:
                 plot_latency_over_time(consolidated_jtl_df, round_name, results_dir)
                 plot_throughput_over_time(consolidated_jtl_df, round_name, results_dir)
-                # MODIFICAÇÃO: A função agora é chamada aqui, dentro do loop, para cada ronda.
                 plot_summary_table(consolidated_jtl_df, round_name, results_dir)
                 print(f"Gráficos de performance consolidados para '{round_name}' gerados.")
 

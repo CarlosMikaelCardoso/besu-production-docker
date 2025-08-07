@@ -1,3 +1,8 @@
+// Exporta as variáveis de ambiente necessárias para a configuração do Besu.
+// export BESU_RPC_URL="http://localhost:8545"
+// export DEPLOYER_PRIVATE_KEY="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
+// export CONTRACT_ADDRESS="0xf6499BA99ca02ba9dEe737E989DCd72818249E66"
+
 const express = require('express');
 const { ethers } = require('ethers');
 const { spawn } = require('child_process');
