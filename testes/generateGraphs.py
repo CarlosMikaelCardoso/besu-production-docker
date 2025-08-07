@@ -71,6 +71,7 @@ def plot_throughput_over_time(df, title, output_path):
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_throughput_{title.lower()}.png"))
     plt.close()
 
+# MODIFICAÇÃO: Removidas as métricas de percentil (90%, 95%, 99%) da tabela de resumo.
 def plot_summary_table(df, title, output_path):
     """Gera e salva uma tabela com as métricas de resumo consolidadas."""
     total_duration = df['elapsed_time'].max()
@@ -80,13 +81,11 @@ def plot_summary_table(df, title, output_path):
         'Métricas': [
             'Total de Amostras', 'Sucesso', 'Falha', 
             'Latência Média (ms)', 'Latência Mínima (ms)', 'Latência Máxima (ms)', 
-            'Latência 90% (ms)', 'Latência 95% (ms)', 'Latência 99% (ms)',
             'Throughput Médio (TPS)'
         ],
         'Valor': [
             len(df), successful_tx, len(df) - successful_tx,
             f"{df['elapsed'].mean():.2f}", df['elapsed'].min(), df['elapsed'].max(),
-            f"{df['elapsed'].quantile(0.90):.2f}", f"{df['elapsed'].quantile(0.95):.2f}", f"{df['elapsed'].quantile(0.99):.2f}",
             f"{throughput:.2f}"
         ]
     }
@@ -102,17 +101,12 @@ def plot_summary_table(df, title, output_path):
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_summary_table_{title.lower()}.png"), bbox_inches='tight', pad_inches=0.1)
     plt.close()
 
-# MODIFICAÇÃO: Esta nova função cria os gráficos de barras para CPU e Memória.
 def plot_resource_bar_charts(df, title, resource_name, unit, output_path):
     """Gera gráficos de barras para a utilização média e máxima de um recurso."""
-    # Agrupa por container e calcula a média e o máximo
     summary = df.groupby('container')[resource_name].agg(['mean', 'max']).reset_index()
     summary = summary.sort_values(by='container').set_index('container')
-
-    # Garante que as cores correspondem à ordem dos nós
     colors = [NODE_COLORS.get(node, '#7f7f7f') for node in summary.index]
 
-    # Gráfico para a Média
     plt.figure(figsize=(10, 6))
     bars = plt.bar(summary.index, summary['mean'], color=colors)
     plt.title(f'Uso Médio de {resource_name.upper()} por Nó - {title}')
@@ -123,7 +117,6 @@ def plot_resource_bar_charts(df, title, resource_name, unit, output_path):
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_avg_{resource_name}_usage_{title.lower()}.png"))
     plt.close()
 
-    # Gráfico para o Máximo (Pico)
     plt.figure(figsize=(10, 6))
     bars = plt.bar(summary.index, summary['max'], color=colors)
     plt.title(f'Uso Máximo de {resource_name.upper()} por Nó - {title}')
@@ -134,7 +127,6 @@ def plot_resource_bar_charts(df, title, resource_name, unit, output_path):
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_max_{resource_name}_usage_{title.lower()}.png"))
     plt.close()
 
-# MODIFICAÇÃO: Esta função agora só é usada para Rede e Disco.
 def plot_resource_line_chart(df, title, column, y_label, output_path):
     """Função para gerar gráficos de linha para Rede e Disco."""
     plt.figure(figsize=(15, 7))
@@ -166,7 +158,6 @@ def main():
     for round_name in rounds:
         print(f"\n--- Processando Ronda Consolidada: {round_name} ---")
 
-        # Processamento de performance (JTL)
         jtl_files = glob.glob(os.path.join(results_dir, f"results_{round_name.lower()}_run_*.jtl"))
         if not jtl_files:
             print(f"Aviso: Nenhum ficheiro JTL encontrado para a ronda '{round_name}'.")
@@ -177,10 +168,10 @@ def main():
             if not consolidated_jtl_df.empty:
                 plot_latency_over_time(consolidated_jtl_df, round_name, results_dir)
                 plot_throughput_over_time(consolidated_jtl_df, round_name, results_dir)
+                # MODIFICAÇÃO: A função agora é chamada aqui, dentro do loop, para cada ronda.
                 plot_summary_table(consolidated_jtl_df, round_name, results_dir)
                 print(f"Gráficos de performance consolidados para '{round_name}' gerados.")
 
-        # Processamento de recursos (Docker)
         stats_files = glob.glob(os.path.join(results_dir, f"docker_stats_{round_name.lower()}_run_*.log"))
         if not stats_files:
             print(f"Aviso: Nenhum ficheiro de estatísticas do Docker encontrado para '{round_name}'.")
@@ -189,11 +180,8 @@ def main():
             all_docker_dfs = [analyze_docker_stats(f) for f in stats_files]
             consolidated_docker_df = pd.concat([df for df in all_docker_dfs if df is not None], ignore_index=True)
             if not consolidated_docker_df.empty:
-                # MODIFICAÇÃO: Chama a nova função para gráficos de barras de CPU e Memória
                 plot_resource_bar_charts(consolidated_docker_df, round_name, 'cpu', '%', results_dir)
                 plot_resource_bar_charts(consolidated_docker_df, round_name, 'mem', 'MB', results_dir)
-                
-                # Mantém os gráficos de linha para Rede e Disco
                 consolidated_docker_df['net_io'] = consolidated_docker_df['net_rx'] + consolidated_docker_df['net_tx']
                 plot_resource_line_chart(consolidated_docker_df, round_name, 'net_io', 'I/O de Rede Consolidado (KB/s)', results_dir)
                 consolidated_docker_df['disk_io'] = consolidated_docker_df['disk_r'] + consolidated_docker_df['disk_w']

@@ -11,7 +11,7 @@ API_HOST="10.126.1.232" # <--- MUDE PARA O IP DA SUA VM ONDE A API ESTÁ A CORRE
 # Número de usuários para o teste (5, 10, 25, 50). Padrão para 5 se nenhum argumento for fornecido.
 NUM_USERS=${1:-5}
 # Número de repetições. Padrão para 1 se nenhum segundo argumento for fornecido.
-NUM_REPETITIONS=${2:-1}
+NUM_REPETITIONS=${1:-1}
 
 # Validação do número de usuários
 case $NUM_USERS in
