@@ -18,6 +18,7 @@ def analyze_jtl(jtl_file):
     """Lê um ficheiro JTL e retorna um DataFrame do Pandas."""
     try:
         df = pd.read_csv(jtl_file)
+        # Calcula o tempo decorrido em segundos desde a primeira transação
         df['elapsed_time'] = (df['timeStamp'] - df['timeStamp'].min()) / 1000
         return df
     except Exception as e:
@@ -35,6 +36,7 @@ def analyze_docker_stats(stats_file):
         df['net_tx'] = df['net_tx'].str.replace('KB', '').astype(float)
         df['disk_r'] = df['disk_r'].str.replace('KB', '').astype(float)
         df['disk_w'] = df['disk_w'].str.replace('KB', '').astype(float)
+        # Adiciona uma coluna de tempo para os gráficos de linha
         df['time'] = df.groupby('container').cumcount() + 1
         return df
     except Exception as e:
@@ -42,15 +44,21 @@ def analyze_docker_stats(stats_file):
         return None
 
 def plot_latency_over_time(df, title, output_path):
-    """Gera e salva um gráfico de latência ao longo do tempo."""
+    """Gera e salva um gráfico de latência ao longo do tempo em segundos."""
+    df_copy = df.copy()
+    df_copy['elapsed_s'] = df_copy['elapsed'] / 1000  # Converte para segundos
+
     plt.figure(figsize=(12, 6))
-    plt.scatter(df['elapsed_time'], df['elapsed'], label='Latência (ms)', alpha=0.5, s=10)
-    df_sorted = df.sort_values(by='elapsed_time')
-    df_sorted['rolling_avg'] = df_sorted['elapsed'].rolling(window=200, min_periods=1).mean()
+    plt.scatter(df_copy['elapsed_time'], df_copy['elapsed_s'], label='Latência (s)', alpha=0.5, s=10)
+    
+    df_sorted = df_copy.sort_values(by='elapsed_time')
+    # Calcula a média móvel na latência em segundos
+    df_sorted['rolling_avg'] = df_sorted['elapsed_s'].rolling(window=200, min_periods=1).mean()
+    
     plt.plot(df_sorted['elapsed_time'], df_sorted['rolling_avg'], color='red', linestyle='--', label='Média Móvel (200 amostras)')
     plt.title(f'Latência Consolidada ao Longo do Tempo - {title}')
     plt.xlabel('Tempo (segundos)')
-    plt.ylabel('Latência da Resposta (ms)')
+    plt.ylabel('Latência da Resposta (s)') # Rótulo atualizado para segundos
     plt.grid(True)
     plt.legend()
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_latency_{title.lower()}.png"))
@@ -61,6 +69,7 @@ def plot_throughput_over_time(df, title, output_path):
     tps_df = df[df['success'] == True].copy()
     tps_df['second'] = tps_df['elapsed_time'].astype(int)
     tps_summary = tps_df.groupby('second').size().reset_index(name='tps')
+    
     plt.figure(figsize=(12, 6))
     plt.plot(tps_summary['second'], tps_summary['tps'], label='Throughput (TPS)', color='green', marker='o', markersize=4, linestyle='-')
     plt.title(f'Throughput Consolidado ao Longo do Tempo - {title}')
@@ -71,24 +80,26 @@ def plot_throughput_over_time(df, title, output_path):
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_throughput_{title.lower()}.png"))
     plt.close()
 
-# MODIFICAÇÃO: Removidas as métricas de percentil (90%, 95%, 99%) da tabela de resumo.
-def plot_summary_table(df, title, output_path):
-    """Gera e salva uma tabela com as métricas de resumo consolidadas."""
-    total_duration = df['elapsed_time'].max()
-    successful_tx = df['success'].sum()
-    throughput = successful_tx / total_duration if total_duration > 0 else 0
+def plot_summary_table_from_dict(summary_data, title, output_path):
+    """Gera e salva uma tabela com as métricas de resumo consolidadas a partir de um dicionário."""
+    # Formata os valores do dicionário para a tabela, convertendo latência para segundos
     summary = {
         'Métricas': [
             'Total de Amostras', 'Sucesso', 'Falha', 
-            'Latência Média (ms)', 'Latência Mínima (ms)', 'Latência Máxima (ms)', 
+            'Latência Média (s)', 'Latência Mínima (s)', 'Latência Máxima (s)', 
             'Throughput Médio (TPS)'
         ],
         'Valor': [
-            len(df), successful_tx, len(df) - successful_tx,
-            f"{df['elapsed'].mean():.2f}", df['elapsed'].min(), df['elapsed'].max(),
-            f"{throughput:.2f}"
+            f"{summary_data['Total de Amostras']:.0f}",
+            f"{summary_data['Sucesso']:.0f}",
+            f"{summary_data['Falha']:.0f}",
+            f"{summary_data['Latência Média (ms)'] / 1000:.2f}",  # Convertido para segundos
+            f"{summary_data['Latência Mínima (ms)'] / 1000:.2f}", # Convertido para segundos
+            f"{summary_data['Latência Máxima (ms)'] / 1000:.2f}", # Convertido para segundos
+            f"{summary_data['Throughput Médio (TPS)']:.2f}"
         ]
     }
+
     summary_df = pd.DataFrame(summary)
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.axis('tight')
@@ -100,7 +111,7 @@ def plot_summary_table(df, title, output_path):
     plt.title(f'Resumo Consolidado - {title}', fontsize=16, y=0.9)
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_summary_table_{title.lower()}.png"), bbox_inches='tight', pad_inches=0.1)
     plt.close()
-
+    
 def plot_resource_bar_charts(df, title, resource_name, unit, output_path):
     """Gera gráficos de barras para a utilização média e máxima de um recurso."""
     summary = df.groupby('container')[resource_name].agg(['mean', 'max']).reset_index()
@@ -159,19 +170,56 @@ def main():
         print(f"\n--- Processando Ronda Consolidada: {round_name} ---")
 
         jtl_files = glob.glob(os.path.join(results_dir, f"results_{round_name.lower()}_run_*.jtl"))
+        stats_files = glob.glob(os.path.join(results_dir, f"docker_stats_{round_name.lower()}_run_*.log"))
+
+        # 1. Processar cada execução JTL individualmente e calcular suas métricas.
+        run_summaries = []
         if not jtl_files:
             print(f"Aviso: Nenhum ficheiro JTL encontrado para a ronda '{round_name}'.")
         else:
             print(f"Ficheiros JTL encontrados: {len(jtl_files)}")
-            all_jtl_dfs = [analyze_jtl(f) for f in jtl_files]
-            consolidated_jtl_df = pd.concat([df for df in all_jtl_dfs if df is not None], ignore_index=True)
-            if not consolidated_jtl_df.empty:
-                plot_latency_over_time(consolidated_jtl_df, round_name, results_dir)
-                plot_throughput_over_time(consolidated_jtl_df, round_name, results_dir)
-                plot_summary_table(consolidated_jtl_df, round_name, results_dir)
+            for jtl_file in jtl_files:
+                df = analyze_jtl(jtl_file)
+                if df is not None and not df.empty:
+                    total_duration = df['elapsed_time'].max()
+                    successful_tx = df['success'].sum()
+                    throughput = successful_tx / total_duration if total_duration > 0 else 0
+                    
+                    run_summary = {
+                        'Total de Amostras': len(df),
+                        'Sucesso': successful_tx,
+                        'Falha': len(df) - successful_tx,
+                        'Latência Média (ms)': df['elapsed'].mean(),
+                        'Latência Mínima (ms)': df['elapsed'].min(),
+                        'Latência Máxima (ms)': df['elapsed'].max(),
+                        'Throughput Médio (TPS)': throughput
+                    }
+                    run_summaries.append(run_summary)
+            
+            # 2. Consolidar as métricas calculando a MÉDIA (para taxas e latências) e a SOMA (para contagens).
+            if run_summaries:
+                summary_df = pd.DataFrame(run_summaries)
+                final_summary_data = {
+                    'Total de Amostras': summary_df['Total de Amostras'].sum(),
+                    'Sucesso': summary_df['Sucesso'].sum(),
+                    'Falha': summary_df['Falha'].sum(),
+                    'Latência Média (ms)': summary_df['Latência Média (ms)'].mean(),
+                    'Latência Mínima (ms)': summary_df['Latência Mínima (ms)'].mean(),
+                    'Latência Máxima (ms)': summary_df['Latência Máxima (ms)'].mean(),
+                    'Throughput Médio (TPS)': summary_df['Throughput Médio (TPS)'].mean()
+                }
+                
+                plot_summary_table_from_dict(final_summary_data, round_name, results_dir)
+
+                # Para gráficos ao longo do tempo, usamos os dados concatenados de todas as execuções
+                all_jtl_dfs = [analyze_jtl(f) for f in jtl_files]
+                consolidated_jtl_df = pd.concat([df for df in all_jtl_dfs if df is not None], ignore_index=True)
+                if not consolidated_jtl_df.empty:
+                    plot_latency_over_time(consolidated_jtl_df, round_name, results_dir)
+                    plot_throughput_over_time(consolidated_jtl_df, round_name, results_dir)
                 print(f"Gráficos de performance consolidados para '{round_name}' gerados.")
 
-        stats_files = glob.glob(os.path.join(results_dir, f"docker_stats_{round_name.lower()}_run_*.log"))
+        # O processamento dos logs do Docker permanece o mesmo.
         if not stats_files:
             print(f"Aviso: Nenhum ficheiro de estatísticas do Docker encontrado para '{round_name}'.")
         else:
