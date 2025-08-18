@@ -18,19 +18,73 @@
     "mixHash": "0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365",
     "coinbase": "0x0000000000000000000000000000000000000000",
     "alloc": {
-      "fe3b557e8fb62b89f4916b721be55ceb828dbd73": {
-        "privateKey": "8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63",
-        "comment": "private key and this comment are ignored. In a real chain, the private key should NOT be stored",
+      "0xfe3b557e8fb62b89f4916b721be55ceb828dbd73": {
         "balance": "0xad78ebc5ac6200000"
       },
-      "627306090abaB3A6e1400e9345bC60c78a8BEf57": {
-        "privateKey": "c87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3",
-        "comment": "private key and this comment are ignored. In a real chain, the private key should NOT be stored",
+      "0x627306090abaB3A6e1400e9345bC60c78a8BEf57": {
         "balance": "90000000000000000000000"
       },
-      "f17f52151EbEF6C7334FAD080c5704D77216b732": {
-        "privateKey": "ae6ae8e5ccbfb04590405997ee2d52d2b330726137b875053c36d94e974d162f",
-        "comment": "private key and this comment are ignored. In a real chain, the private key should NOT be stored",
+      "0xf17f52151EbEF6C7334FAD080c5704D77216b732": {
+        "balance": "90000000000000000000000"
+      },
+      "0x32E619f049E12330210e91927441753FA68Af457": {
+        "balance": "90000000000000000000000"
+      },
+      "0x19281f7c452988Da672839694b2A84B048eD0E9a": {
+        "balance": "90000000000000000000000"
+      },
+      "0x53d608BE8Ab6208AFb355aac1988B615c0741bd0": {
+        "balance": "90000000000000000000000"
+      },
+      "0x2cee9AFF7eAA461a7Bf1A877bb983c2f41a390Ee": {
+        "balance": "90000000000000000000000"
+      },
+      "0xFf3161e792A4b3798Ded05C29518D695EEd9d2EF": {
+        "balance": "90000000000000000000000"
+      },
+      "0x1C6e0EFbB353AbC7Ba809F3773c1237b6E6312F9": {
+        "balance": "90000000000000000000000"
+      },
+      "0xddC167f7a47e28Add1A63a3Af2A3fEe01af358b2": {
+        "balance": "90000000000000000000000"
+      },
+      "0xA5F119B1fa1930ddDD0034A90FC7e431910Cc192": {
+        "balance": "90000000000000000000000"
+      },
+      "0x06180a5a25e7Ca91F3f953Bf6197Af5F6Ce463aF": {
+        "balance": "90000000000000000000000"
+      },
+      "0x14f9Ba624920a2772ccbaC8f10fEc1484F0aCd1B": {
+        "balance": "90000000000000000000000"
+      },
+      "0x40a32b0E14f945daB77470925C51d1219d7B4e1A": {
+        "balance": "90000000000000000000000"
+      },
+      "0x950083CF20eA7e25148C35341a2bd40A1B177169": {
+        "balance": "90000000000000000000000"
+      },
+      "0xE48DA5496A73bA0bfacEadc07b04c6Fbc240Fa36": {
+        "balance": "90000000000000000000000"
+      },
+      "0xA4F6d14173a4C4C4F214Da4b5344f549c3A11cF9": {
+        "balance": "90000000000000000000000"
+      },
+      "0x8Eb78Bc860E40475bA989B9104C4ADDAa96C0B44": {
+        "balance": "90000000000000000000000"
+      },
+      "0x4DD0db5bEB42552e81587E8655f1B769b39f2751": {
+        "balance": "90000000000000000000000"
+      },
+      "0x6BD85f4a3d23a82aFe9b87dFBC39fe1D5E68C65A": {
+        "balance": "90000000000000000000000"
+      },
+      "0xD75C924dA1cEf8c5145A3E4c38b0A68ABbC0958e": {
+        "balance": "90000000000000000000000"
+      },
+      "0x4b6a9dA75b555aa4C6cE3790D6f325DE71AbCb6D": {
+        "balance": "90000000000000000000000"
+      },
+      "0x14D3cD67e77B81A9ab77CF417a182F7EDa4024DA": {
         "balance": "90000000000000000000000"
       }
     }
