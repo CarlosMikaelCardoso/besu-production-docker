@@ -1,7 +1,7 @@
 // Exporta as variáveis de ambiente necessárias para a configuração do Besu.
 // export BESU_RPC_URL="http://localhost:8545"
 // export DEPLOYER_PRIVATE_KEY="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
-// export CONTRACT_ADDRESS="0x42699A7612A82f1d9C36148af9C77354759b210b"
+// export CONTRACT_ADDRESS="0x7189F6Ca8e6f009BA77d3bf622C756f811034d26"
 
 // --- Importações ---
 const express = require('express');
@@ -47,16 +47,52 @@ const CONTRACT_ABI = [
 // Conecta-se apenas a um nó Besu
 const BESU_RPC_URL = process.env.BESU_RPC_URL || "http://localhost:8545";
 const provider = new ethers.JsonRpcProvider(BESU_RPC_URL);
-const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
-const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+// const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
+// const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
+const wallets = JSON.parse(fs.readFileSync(path.join(__dirname, 'wallets.json'), 'utf-8'));
 
-// Contadores e gerenciamento de nonce
+class NonceManager {
+    constructor(signer) {
+        this.signer = signer;
+        this.noncePromise = signer.getNonce("pending");
+    }
+    async send(transactionPromise) {
+        const nonce = await this.noncePromise;
+        this.noncePromise = Promise.resolve(nonce + 1);
+        try {
+            const tx = await transactionPromise({ nonce });
+            return tx;
+        } catch (error) {
+            if (error.code === 'NONCE_EXPIRED' || error.code === 'REPLACEMENT_UNDERPRICED') {
+                 console.error(`(Worker ${this.signer.address}) Nonce dessincronizado. A reiniciar contagem.`);
+                 this.noncePromise = this.signer.getNonce("pending");
+            }
+            throw error;
+        }
+    }
+}
+
+// Cria um "worker" para cada carteira. Cada worker tem seu próprio signer e nonce manager.
+const workerPool = wallets.map(walletInfo => {
+    const signer = new ethers.Wallet(walletInfo.privateKey, provider);
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    return {
+        address: signer.address,
+        signer: signer,
+        contract: contract, // Cada signer precisa de sua própria instância de contrato
+        nonceManager: new NonceManager(signer)
+    };
+});
+
+let nextWorkerIndex = 0; // Usado para distribuir as requisições em round-robin
+console.log(`✅ Pool de alta performance inicializado com ${workerPool.length} workers.`);
+
+// Contadores de transações para logging
 let openTxCount = 1;
 let transferTxCount = 1;
-let noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
 
-// --- Lógica de Monitoramento do Docker (Completa) ---
+// --- Lógica de Monitoramento do Docker ---
 const monitoringProcesses = {};
 const DOCKER_CONTAINERS_TO_MONITOR = ["node1", "node2", "node3", "node4", "node5", "node6"];
 const LOG_DIR = path.join(os.tmpdir(), 'jmeter_docker_logs');
@@ -106,8 +142,6 @@ app.post('/monitor/start', (req, res) => {
                     const netTxKB = (netTx / 1024).toFixed(2);
                     const diskReadKB = (diskRead / 1024).toFixed(2);
                     const diskWriteKB = (diskWrite / 1024).toFixed(2);
-
-                    // Linha de Log Atualizada
                     const logLine = `${stats.name.substring(1)},${cpuPercent.toFixed(2)}%,${memUsage}MiB,${netRxKB}KB,${netTxKB}KB,${diskReadKB}KB,${diskWriteKB}KB\n`;
                     logStream.write(logLine);
                 });
@@ -153,48 +187,46 @@ app.get('/monitor/logs/:roundName/:runNumber', (req, res) => {
 
 // --- Endpoints de Transação Síncronos ---
 
+// MODIFICAÇÃO: Atualizado para usar o worker pool
 app.post('/open', async (req, res) => {
+    const worker = workerPool[nextWorkerIndex];
+    nextWorkerIndex = (nextWorkerIndex + 1) % workerPool.length;
+    const { nonceManager, contract } = worker;
+
     const { accountId, amount } = req.body;
     if (!accountId || amount === undefined) {
         return res.status(400).json({ error: "Campos 'accountId' e 'amount' são obrigatórios." });
     }
     try {
-        const nonce = await noncePromise;
-        noncePromise = Promise.resolve(nonce + 1);
-        const tx = await contract.open(accountId, amount, { nonce });
+        const tx = await nonceManager.send(options => contract.open(accountId, amount, options));
         const receipt = await tx.wait();
-        console.log(`Transação 'open' #${openTxCount} confirmada com sucesso! Hash: ${receipt.hash}`);
+        console.log(`(Worker ${worker.address.substring(0,10)}) Transação 'open' #${openTxCount} confirmada! Hash: ${receipt.hash}`);
         openTxCount++;
         res.status(200).json({ transactionHash: receipt.hash });
     } catch (error) {
-        console.error(`Erro ao processar transação 'open' para a conta ${accountId}:`, error);
-        if (error.code === 'NONCE_EXPIRED') {
-            noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
-            console.error("Nonce dessincronizado. A reiniciar a contagem de nonce.");
-        }
+        console.error(`(Worker ${worker.address}) Erro 'open' para conta ${accountId}:`, error);
         res.status(500).json({ error: "Falha ao confirmar a transação 'open'.", details: error.message });
     }
 });
 
+// MODIFICAÇÃO: Atualizado para usar o worker pool
 app.post('/transfer', async (req, res) => {
+    const worker = workerPool[nextWorkerIndex];
+    nextWorkerIndex = (nextWorkerIndex + 1) % workerPool.length;
+    const { nonceManager, contract } = worker;
+
     const { from, to, amount } = req.body;
     if (!from || !to || amount === undefined) {
         return res.status(400).json({ error: "Os campos 'from', 'to' e 'amount' são obrigatórios." });
     }
     try {
-        const nonce = await noncePromise;
-        noncePromise = Promise.resolve(nonce + 1);
-        const tx = await contract.transfer(from, to, amount, { nonce });
+        const tx = await nonceManager.send(options => contract.transfer(from, to, amount, options));
         const receipt = await tx.wait();
-        console.log(`Transação 'transfer' #${transferTxCount} confirmada com sucesso! Hash: ${receipt.hash}`);
+        console.log(`(Worker ${worker.address.substring(0,10)}) Transação 'transfer' #${transferTxCount} confirmada! Hash: ${receipt.hash}`);
         transferTxCount++;
         res.status(200).json({ transactionHash: receipt.hash });
     } catch (error) {
-        console.error(`Erro ao processar transação 'transfer' de ${from} para ${to}:`, error);
-        if (error.code === 'NONCE_EXPIRED') {
-            noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
-            console.error("Nonce dessincronizado. A reiniciar a contagem de nonce.");
-        }
+        console.error(`(Worker ${worker.address}) Erro 'transfer' de ${from} para ${to}:`, error);
         res.status(500).json({ error: "Falha ao confirmar a transação 'transfer'.", details: error.message });
     }
 });
@@ -211,53 +243,79 @@ app.get('/query/:accountId', async (req, res) => {
     }
 });
 
-// --- Endpoints Assíncronos ---
+// --- Endpoint de Recibo de Transação ---
+
+app.get('/receipt/:txHash', async (req, res) => {
+    try {
+        const { txHash } = req.params;
+        if (!txHash || !/^0x([A-Fa-f0-9]{64})$/.test(txHash)) {
+            return res.status(400).json({ status: 'error', message: 'Formato de hash de transação inválido.' });
+        }
+
+        const receipt = await provider.getTransactionReceipt(txHash);
+
+        if (receipt) {
+            res.status(200).json({ 
+                status: 'confirmed', 
+                receipt: {
+                    transactionHash: receipt.transactionHash,
+                    blockNumber: receipt.blockNumber.toString(),
+                    gasUsed: receipt.gasUsed.toString(),
+                    status: receipt.status
+                }
+            });
+        } else {
+            res.status(202).json({ status: 'pending' });
+        }
+    } catch (error) {
+        console.error(`Erro ao obter o recibo para ${req.params.txHash}:`, error);
+        res.status(500).json({ status: 'error', message: 'Erro interno ao buscar recibo da transação.' });
+    }
+});
+
+// --- Endpoints de Transação Assíncronos ---
 
 app.post('/open-async', async (req, res) => {
+    // 1. Pega o próximo worker do pool (distribuição round-robin)
+    const worker = workerPool[nextWorkerIndex];
+    nextWorkerIndex = (nextWorkerIndex + 1) % workerPool.length;
+
+    // 2. Extrai o nonceManager e o contrato específicos deste worker
+    const { nonceManager, contract } = worker;
+
     const { accountId, amount } = req.body;
     if (!accountId || amount === undefined) {
         return res.status(400).json({ error: "Campos 'accountId' e 'amount' são obrigatórios." });
     }
     try {
-        const nonce = await noncePromise;
-        noncePromise = Promise.resolve(nonce + 1);
-        const txResponse = await contract.open(accountId, amount, { nonce });
-        
-        // --- LOG ADICIONADO AQUI ---
-        console.log(`(Async) Transação 'open' para a conta ${accountId} submetida. Hash: ${txResponse.hash}`);
-
+        // 3. Usa o nonceManager do worker para enviar a transação
+        const txResponse = await nonceManager.send(options => contract.open(accountId, amount, options));
+        console.log(`(Worker ${worker.address.substring(0, 10)}...) Transação 'open' submetida. Hash: ${txResponse.hash}`);
         res.status(202).json({ message: `Transação 'open' aceite para processamento.`, transactionHash: txResponse.hash });
     } catch (error) {
-        console.error(`(Async) Erro ao submeter transação 'open' para ${accountId}:`, error);
-        if (error.code === 'NONCE_EXPIRED') {
-            noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
-            console.error("Nonce dessincronizado. A reiniciar a contagem de nonce.");
-        }
+        console.error(`(Worker ${worker.address}) Erro ao submeter transação 'open' para ${accountId}:`, error);
         res.status(500).json({ error: "Falha ao submeter a transação 'open'.", details: error.message });
     }
 });
 
-// MODIFICAÇÃO: Adicionado console.log para feedback visual da submissão.
+// MODIFICAÇÃO: Adicionada a extração das variáveis do req.body
 app.post('/transfer-async', async (req, res) => {
-    const { from, to, amount } = req.body;
+    const worker = workerPool[nextWorkerIndex];
+    nextWorkerIndex = (nextWorkerIndex + 1) % workerPool.length;
+    const { nonceManager, contract } = worker;
+
+    // A linha abaixo estava em falta
+    const { from, to, amount } = req.body; 
+
     if (!from || !to || amount === undefined) {
         return res.status(400).json({ error: "Os campos 'from', 'to' e 'amount' são obrigatórios." });
     }
     try {
-        const nonce = await noncePromise;
-        noncePromise = Promise.resolve(nonce + 1);
-        const txResponse = await contract.transfer(from, to, amount, { nonce });
-
-        // --- LOG ADICIONADO AQUI ---
-        console.log(`(Async) Transação 'transfer' de ${from} para ${to} submetida. Hash: ${txResponse.hash}`);
-
+        const txResponse = await nonceManager.send(options => contract.transfer(from, to, amount, options));
+        console.log(`(Worker ${worker.address.substring(0,10)}) Transação 'transfer-async' submetida. Hash: ${txResponse.hash}`);
         res.status(202).json({ message: "Transação 'transfer' aceite para processamento.", transactionHash: txResponse.hash });
     } catch (error) {
-        console.error(`(Async) Erro ao submeter transação 'transfer' de ${from} para ${to}:`, error);
-        if (error.code === 'NONCE_EXPIRED') {
-            noncePromise = provider.getTransactionCount(signer.getAddress(), "pending");
-            console.error("Nonce dessincronizado. A reiniciar a contagem de nonce.");
-        }
+        console.error(`(Worker ${worker.address}) Erro 'transfer-async' de ${from} para ${to}:`, error);
         res.status(500).json({ error: "Falha ao submeter a transação 'transfer'.", details: error.message });
     }
 });
