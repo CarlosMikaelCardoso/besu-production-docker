@@ -101,14 +101,18 @@ def plot_summary_table_from_dict(summary_data, title, output_path):
     }
 
     summary_df = pd.DataFrame(summary)
-    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    # --- MODIFICAÇÃO: Ajuste dos parâmetros de estilo para corresponder ao Caliper ---
+    fig, ax = plt.subplots(figsize=(6, 4)) # Tamanho da figura reduzido
     ax.axis('tight')
     ax.axis('off')
     table = ax.table(cellText=summary_df.values, colLabels=summary_df.columns, loc='center', cellLoc='center')
     table.auto_set_font_size(False)
-    table.set_fontsize(12)
-    table.scale(1.2, 1.2)
-    plt.title(f'Resumo Consolidado - {title}', fontsize=16, y=0.9)
+    table.set_fontsize(14) # Tamanho da fonte aumentado
+    table.scale(1.2, 1.5) # Escala ajustada (especialmente a altura)
+    plt.title(f'Resumo Consolidado - {title}', fontsize=18, y=0.95) # Fonte do título e posição ajustados
+    # --- FIM DA MODIFICAÇÃO ---
+
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_summary_table_{title.lower()}.png"), bbox_inches='tight', pad_inches=0.1)
     plt.close()
     

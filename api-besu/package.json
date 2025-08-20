@@ -17,6 +17,7 @@
   "license": "ISC",
   "dependencies": {
     "dockerode": "^4.0.7",
+    "ether": "^0.0.9",
     "ethers": "^6.15.0",
     "express": "^4.21.2"
   }

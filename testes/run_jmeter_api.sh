@@ -5,13 +5,13 @@ JMETER_VERSION="5.6.3"
 JMETER_DIR="apache-jmeter-${JMETER_VERSION}"
 JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
 CONTRACT_ADDRESS_FILE="contract_address.txt"
-API_HOST="10.126.1.232" # <--- MUDE PARA O IP DA SUA VM ONDE A API ESTÁ A CORRER
+API_HOST="10.126.1.249" # <--- MUDE PARA O IP DA SUA VM ONDE A API ESTÁ A CORRER
 
 # === NOVA CONFIGURAÇÃO PARA EXECUÇÕES MÚLTIPLAS E SELEÇÃO DE USUÁRIOS ===
 # Número de usuários para o teste (5, 10, 25, 50). Padrão para 5 se nenhum argumento for fornecido.
 NUM_USERS=${1:-5}
 # Número de repetições. Padrão para 1 se nenhum segundo argumento for fornecido.
-NUM_REPETITIONS=${1:-1}
+NUM_REPETITIONS=${2:-1}
 
 # Validação do número de usuários
 case $NUM_USERS in

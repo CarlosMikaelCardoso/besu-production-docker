@@ -2,7 +2,7 @@
 
 # --- CONFIGURAÇÕES ---
 NUM_USERS=${1:-5}
-NUM_REPETITIONS=${1:-1}
+NUM_REPETITIONS=${2:-1}
 
 # --- Adicione o IP da sua VM do Besu aqui ---
 export DOCKER_HOST="tcp://10.126.1.249:2375"
