@@ -5,7 +5,7 @@ NUM_USERS=${1:-5}
 NUM_REPETITIONS=${2:-1}
 
 # --- Adicione o IP da sua VM do Besu aqui ---
-export DOCKER_HOST="tcp://10.126.1.249:2375"
+export DOCKER_HOST="tcp://"$(hostname -I | awk '{print $1}')":2375"
 
 # Validação do número de usuários
 case $NUM_USERS in
@@ -34,7 +34,7 @@ echo "Resultados detalhados de cada execução serão salvos em: $CALIPER_RUNS_D
 # --- FUNÇÃO DE VERIFICAÇÃO ---
 wait_for_besu_nodes() {
     echo "A aguardar que a porta WebSocket do Besu (8645) fique disponível..."
-    local node_host="10.126.1.249" # Use o IP da VM do Besu aqui
+    local node_host=$(hostname -I | awk '{print $1}') # Use o IP da VM do Besu aqui
     local ws_port="8645"
     local timeout=120
     local start_time=$(date +%s)

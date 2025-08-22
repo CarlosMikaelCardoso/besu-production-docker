@@ -63,7 +63,7 @@ generate_keys_and_configs() {
     # O generate-nodes-config.sh fornecido já define o IP como 127.0.0.1.
     # Apenas garantimos que o script seja executável.
     chmod +x generate-nodes-config.sh
-    echo "Script generate-nodes-config.sh configurado com IP 127.0.0.1 (verifique o conteúdo do script)."
+    echo "Script generate-nodes-config.sh configurado com IP da maquina (verifique o conteúdo do script)."
 
     # 2. Gera os arquivos da blockchain e as chaves privadas
     echo "Gerando arquivos da blockchain e chaves privadas em networkFiles/..."

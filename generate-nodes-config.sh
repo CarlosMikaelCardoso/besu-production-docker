@@ -5,7 +5,7 @@ BASE_DIR="$(pwd)"  # Diretório atual
 GENESIS_DIR="$BASE_DIR/networkFiles/genesis.json"
 KEYS_DIR="$BASE_DIR/networkFiles/keys"
 OUTPUT_DIR="$BASE_DIR/Permissioned-Network"
-IP="10.126.1.249" # <<<<<<<< Edite o IP aqui
+IP=$(hostname -I | awk '{print $1}') # <<<<<<<< Edite o IP aqui
 START_PORT=30303
 
 # Garante que as pastas existem
