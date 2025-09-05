@@ -5,23 +5,23 @@ import sys
 import glob
 import re
 
-# Dicionário para garantir cores fixas para cada nó.
+# Dictionary to ensure fixed colors for each node.
 NODE_COLORS = {
-    'node1': '#1f77b4',  # Azul
-    'node2': '#ff7f0e',  # Laranja
-    'node3': '#2ca02c',  # Verde
-    'node4': '#d62728',  # Vermelho
-    'node5': '#9467bd',  # Roxo
-    'node6': '#8c564b',  # Castanho
+    'node1': '#1f77b4',  # Blue
+    'node2': '#ff7f0e',  # Orange
+    'node3': '#2ca02c',  # Green
+    'node4': '#d62728',  # Red
+    'node5': '#9467bd',  # Purple
+    'node6': '#8c564b',  # Brown
 }
 
 def parse_caliper_log(log_file):
-    """Lê um ficheiro de log do Caliper e extrai as tabelas de performance e recursos."""
+    """Reads a Caliper log file and extracts the performance and resource tables."""
     try:
         with open(log_file, 'r') as f:
             content = f.read()
     except Exception as e:
-        print(f"Erro ao ler o ficheiro de log {log_file}: {e}")
+        print(f"Error reading log file {log_file}: {e}")
         return None, None
 
     performance_data = []
@@ -51,7 +51,7 @@ def parse_caliper_log(log_file):
                     resource_data.append([round_name] + parts)
 
     if not performance_data:
-        print(f"Aviso: Nenhuma tabela de performance encontrada no ficheiro {os.path.basename(log_file)}")
+        print(f"Warning: No performance tables found in file {os.path.basename(log_file)}")
         return None, None
         
     perf_df = pd.DataFrame(performance_data, columns=['Round', 'Name', 'Succ', 'Fail', 'Send Rate (TPS)', 'Max Latency (s)', 'Min Latency (s)', 'Avg Latency (s)', 'Throughput (TPS)'])
@@ -71,23 +71,23 @@ def parse_caliper_log(log_file):
     return perf_df, res_df
 
 def plot_summary_table_per_round(df_round, num_repetitions, output_path):
-    """Gera uma tabela de resumo de performance para uma única ronda."""
+    """Generates a performance summary table for a single round."""
     if df_round.empty: return
     
     round_name = df_round['Name'].iloc[0]
     base_tx_counts = {'open': 1000, 'query': 1000, 'transfer': 50}
-    
     successful_tx = df_round['Succ'].iloc[0]
     failed_tx = df_round['Fail'].iloc[0]
-    total_samples = successful_tx + failed_tx # O total é a soma do que foi executado
+    total_samples = successful_tx + failed_tx
     
+    # MODIFICATION: Labels translated to English
     summary_data = {
-        'Métricas': [
-            'Total de Amostras', 'Sucesso', 'Falha', 
-            'Latência Média (s)', 'Latência Mínima (s)', 'Latência Máxima (s)', 
-            'Throughput Médio (TPS)'
+        'Metrics': [
+            'Total Samples', 'Success', 'Failure', 
+            'Average Latency (s)', 'Minimum Latency (s)', 'Maximum Latency (s)', 
+            'Average Throughput (TPS)'
         ],
-        'Valor': [
+        'Value': [
             f"{total_samples:.0f}",
             f"{successful_tx:.0f}",
             f"{failed_tx:.0f}",
@@ -106,12 +106,13 @@ def plot_summary_table_per_round(df_round, num_repetitions, output_path):
     table.auto_set_font_size(False)
     table.set_fontsize(14)
     table.scale(1.2, 1.5)
-    plt.title(f'Resumo Consolidado - {round_name.capitalize()}', fontsize=18, y=0.95)
+    # MODIFICATION: Title translated to English
+    plt.title(f'Consolidated Summary - {round_name.capitalize()}', fontsize=18, y=0.95)
     plt.savefig(os.path.join(output_path, f"CONSOLIDATED_caliper_summary_{round_name}.png"), bbox_inches='tight', pad_inches=0.1)
     plt.close()
 
 def plot_resource_bar_chart_per_round(df_round, metric, unit, round_name, output_path):
-    """Gera um gráfico de barras de recursos para uma única ronda."""
+    """Generates a resource bar chart for a single round."""
     if df_round.empty: return
 
     summary = df_round.sort_values(by='Name').set_index('Name')
@@ -119,10 +120,11 @@ def plot_resource_bar_chart_per_round(df_round, metric, unit, round_name, output
 
     plt.figure(figsize=(10, 6))
     bars = plt.bar(summary.index, summary[metric], color=colors)
-    metric_name = metric.replace('(avg)', 'Médio').replace('[MB]', '').replace('%', '')
-    plt.title(f'Uso {metric_name} por Nó - {round_name.capitalize()}')
-    plt.ylabel(f'Uso ({unit})')
-    plt.xlabel('Nó')
+    # MODIFICATION: Title and labels translated to English
+    metric_name = metric.replace('(avg)', 'Average').replace('[MB]', '').replace('%', '')
+    plt.title(f'{metric_name} Usage per Node - {round_name.capitalize()}')
+    plt.ylabel(f'Usage ({unit})')
+    plt.xlabel('Node')
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.bar_label(bars, fmt='%.2f')
     plt.tight_layout()
@@ -132,19 +134,19 @@ def plot_resource_bar_chart_per_round(df_round, metric, unit, round_name, output
 
 def main():
     if len(sys.argv) < 3:
-        print("Uso: python generate_caliper_graphs.py <diretorio_dos_resultados> <numero_de_repeticoes>")
+        print("Usage: python generate_caliper_graphs.py <results_directory> <number_of_repetitions>")
         sys.exit(1)
 
     results_dir = sys.argv[1]
     num_repetitions = int(sys.argv[2])
     
+    print("Step 1: Starting script and finding log files...")
     log_files = glob.glob(os.path.join(results_dir, "caliper_log_run_*.txt"))
     if not log_files:
-        print(f"Aviso: Nenhum ficheiro de log do Caliper encontrado em {results_dir}")
+        print(f"Warning: No Caliper log files found in {results_dir}")
         return
 
-    print(f"\n--- A gerar gráficos consolidados para {len(log_files)} execução(ões) do Caliper ---")
-    
+    print("Step 2: Parsing log files...")
     all_perf_dfs = []
     all_res_dfs = []
 
@@ -153,6 +155,7 @@ def main():
         if perf_df is not None: all_perf_dfs.append(perf_df)
         if res_df is not None: all_res_dfs.append(res_df)
 
+    print("Step 3: Consolidating data and generating tables...")
     if all_perf_dfs:
         full_perf_df = pd.concat(all_perf_dfs, ignore_index=True)
         agg_rules = {
@@ -165,7 +168,8 @@ def main():
         for round_name in consolidated_perf_df['Name'].unique():
             round_df = consolidated_perf_df[consolidated_perf_df['Name'] == round_name]
             plot_summary_table_per_round(round_df, num_repetitions, results_dir)
-        print("Tabelas de performance do Caliper geradas.")
+        print("Caliper performance tables generated.")
+        print("Step 4: Caliper performance tables generated.")
 
     if all_res_dfs:
         consolidated_res_df = pd.concat(all_res_dfs).groupby(['Round', 'Name']).mean(numeric_only=True).reset_index()
@@ -173,9 +177,10 @@ def main():
             round_df = consolidated_res_df[consolidated_res_df['Round'] == round_name]
             plot_resource_bar_chart_per_round(round_df, 'CPU%(avg)', '%', round_name, results_dir)
             plot_resource_bar_chart_per_round(round_df, 'Memory(avg) [MB]', 'MB', round_name, results_dir)
-        print("Gráficos de barras de recursos do Caliper gerados.")
+        print("Caliper resource bar charts generated.")
+        print("Step 5: Caliper resource bar charts generated.")
 
-    print("\nProcesso de geração de gráficos do Caliper concluído!")
-
+    print("\nCaliper graph generation process completed!")
+    
 if __name__ == "__main__":
     main()

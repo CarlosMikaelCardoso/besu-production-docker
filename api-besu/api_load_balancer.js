@@ -1,6 +1,6 @@
 // Exporta as variáveis de ambiente necessárias para a configuração do Besu.
 // export DEPLOYER_PRIVATE_KEY="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
-// export CONTRACT_ADDRESS="0xb2936025133116DC4CB4729026a2beeCb12830a3"
+// export CONTRACT_ADDRESS="0x8a9b0aD54235AcF3168ebb7dF1aBD969bd997d78"
 
 const express = require('express');
 const { spawn } = require('child_process');
@@ -65,7 +65,7 @@ class DynamicLoadBalancer {
             transfer: []
         };
         
-        this.HISTORY_LIMIT = 6;
+        this.HISTORY_LIMIT = 12;
         this.MAX_USES_IN_HISTORY = 2;
     }
 
@@ -75,6 +75,7 @@ class DynamicLoadBalancer {
      * @returns {object} A instância de workload do nó selecionado.
      */
     getNextInstance(operationType) {
+
         const history = this.history[operationType];
         
         // 1. Contar quantas vezes cada nó foi usado recentemente
