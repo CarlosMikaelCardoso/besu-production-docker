@@ -74,21 +74,42 @@ check_and_install_java() {
 }
 
 generate_caliper_style_accounts_csv() {
-    echo "Gerando arquivos CSV de contas..."
+    echo "Gerando arquivos CSV de contas (um por thread)..."
     local accounts_file="$JMETER_RUNS_DIR/all_accounts.txt"
-    local open_csv="$JMETER_RUNS_DIR/open_accounts.csv"
+    local open_csv_prefix="$JMETER_RUNS_DIR/open_accounts_thread_"
     local transfer_csv="$JMETER_RUNS_DIR/transfer_accounts.csv"
+    
+    # Apaga contas antigas para garantir que não haja lixo de execuções anteriores
+    rm -f "${open_csv_prefix}"*
+    rm -f "$accounts_file"
+
+    local accounts_per_thread=$((NUMBER_OF_ACCOUNTS / NUM_USERS))
+
     node -e "
         const DICTIONARY = 'abcdefghijklmnopqrstuvwxyz';
         function get26Num(n) { let result = ''; while(n >= 0) { result = DICTIONARY.charAt(n % DICTIONARY.length) + result; n = Math.floor(n / DICTIONARY.length) - 1; } return result; }
         const fs = require('fs');
-        const accounts = [];
-        for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) { accounts.push('userJmeter' + get26Num(i)); }
-        fs.writeFileSync('${open_csv}', 'accountId\n' + accounts.join('\n'));
-        fs.writeFileSync('${accounts_file}', accounts.join('\n'));
-        console.log('${NUMBER_OF_ACCOUNTS} contas geradas para os testes open e query.');
+        
+        let total_accounts = [];
+        let account_index = 0;
+
+        for (let threadNum = 1; threadNum <= ${NUM_USERS}; threadNum++) {
+            const thread_accounts = [];
+            for (let i = 0; i < ${accounts_per_thread}; i++) {
+                const accountName = 'userJmeter' + get26Num(account_index++);
+                thread_accounts.push(accountName);
+                total_accounts.push(accountName);
+            }
+            // Gera um CSV para cada thread
+            fs.writeFileSync(\`${open_csv_prefix}\${threadNum}.csv\`, 'accountId\n' + thread_accounts.join('\n'));
+        }
+        
+        // Mantém um arquivo com todas as contas para a lógica de transferência
+        fs.writeFileSync('${accounts_file}', total_accounts.join('\n'));
+        console.log('${NUMBER_OF_ACCOUNTS} contas geradas e divididas em ${NUM_USERS} arquivos.');
     "
     if [ $? -ne 0 ]; then echo "Erro: Falha ao gerar contas com Node.js."; exit 1; fi
+
     echo "source_account,target_account" > "$transfer_csv"
     for ((i=0; i<$TRANSFER_TX_NUMBER; i++)); do
         source_acc=$(shuf -n 1 "$accounts_file")
@@ -221,9 +242,10 @@ do
     echo -e "\n--- Iniciando Execução JMeter #$i de $NUM_REPETITIONS ---"
     
     # run_test_and_monitor <jmx_file> <round_name> <run_number> <csv_file> <is_write_operation>
-    run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" true
-    run_test_and_monitor "$JMX_QUERY" "Query" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" false
+    run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts_thread_" true
+    run_test_and_monitor "$JMX_QUERY" "Query" "$i" "$JMETER_RUNS_DIR/open_accounts_thread_" false
     run_test_and_monitor "$JMX_TRANSFER" "Transfer" "$i" "$JMETER_RUNS_DIR/transfer_accounts.csv" true
+
 done
 
 echo -e "\n--- Gerando gráficos e relatórios consolidados de todas as execuções... ---"
