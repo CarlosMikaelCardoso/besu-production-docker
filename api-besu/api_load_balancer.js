@@ -284,7 +284,7 @@ app.listen(port, () => {
     console.log(`Servidor da API (Load Balancer) a correr em http://localhost:${port}`);
     console.log(`Usando contrato no endereço: ${CONTRACT_ADDRESS}`);
     console.log('Estratégia de Balanceamento de Carga:');
-    console.log('- Operações "Open"   -> Nós 1, 2, 3');
+    console.log('- Operações "Open"   -> Nós 1, 2, 3, 4, 5, 6');
     console.log('- Operações "Query"  -> Nós 1, 2, 3, 4, 5, 6');
-    console.log('- Operações "Transfer" -> Nós 4, 5, 6');
+    console.log('- Operações "Transfer" -> Nós 1, 2, 3, 4, 5, 6');
 });

@@ -3,7 +3,7 @@
     "blockchain": "ethereum"
   },
   "ethereum": {
-    "url": "ws://10.126.1.249:8645",
+    "url": "ws://$(hostname -I | awk '{print $1}'):8645",
     "contractDeployerAddress": "fe3b557e8fb62b89f4916b721be55ceb828dbd73",
     "contractDeployerAddressPrivateKey": "8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63",
     "fromAddressSeed": "0x3f841bf589fdf83a521e55d51afddc34fa65351161eead24f064855fc29c9580",

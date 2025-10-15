@@ -20,7 +20,7 @@ cleanup() {
     # Derruba todos os contêineres definidos no docker-compose.yaml, ignorando erros se não estiverem rodando
     sudo docker-compose down || true 
     # Remove diretórios e arquivos gerados
-    rm -rf besu-* "${JAVA_VERSION}" networkFiles Permissioned-Network/ genesis.json
+    sudo rm -rf besu-* "${JAVA_VERSION}" networkFiles Permissioned-Network/ genesis.json
     echo "Limpeza concluída."
 }
 

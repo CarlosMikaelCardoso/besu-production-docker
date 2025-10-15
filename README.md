@@ -1,80 +1,108 @@
-# Hyperledger Besu - Rede QBFT Permissional
+# Hyperledger Besu - Permissioned QBFT Network
 
-Bem-vindo ao projeto **Besu Production Docker**! Este repositório foi desenvolvido para facilitar a criação e o gerenciamento de uma rede blockchain permissionada com **Hyperledger Besu**, utilizando o mecanismo de consenso **QBFT**, ideal para ambientes de produção.
+Welcome to the **Besu Production Docker** project! This repository is designed to facilitate the creation and management of a permissioned blockchain network with **Hyperledger Besu**, using the **QBFT** consensus mechanism, ideal for production environments.
 
-## Funcionalidades
+## Features
 
-- **Setup Automatizado:** Scripts que automatizam a geração de chaves, arquivos de configuração e a estrutura de diretórios da rede.
-- **Orquestração com Docker:** Uso de Docker e Docker-Compose para subir e gerenciar os nós da rede de forma isolada e consistente.
-- **Rede Permissionada:** Configuração de uma rede privada onde apenas nós e contas autorizadas podem participar.
-- **Automação de Contratos:** Inclui scripts para compilar, implantar e testar smart contracts na rede.
+- **Automated Setup:** Scripts that automate the generation of keys, configuration files, and the network's directory structure.
+- **Orchestration with Docker:** Use of Docker and Docker-Compose to launch and manage the network nodes in an isolated and consistent manner.
+- **Permissioned Network:** Configuration of a private network where only authorized nodes and accounts can participate.
+- **Contract Automation:** Includes scripts to compile, deploy, and test smart contracts on the network.
 
-## Requisitos
+## Requirements
 
-Os requisitos são instalados automaticamente pelo script `setup_besu_networks.sh`, mas é importante garantir que você tenha os seguintes pré-requisitos (cURL, wget, tar):
+The requirements are installed automatically by the `setup_besu_networks.sh` script, but it is important to ensure you have the following prerequisites (cURL, wget, tar):
 
 - **Java JDK 17+**
 - **Besu v24.7.0+**
 - **Docker & Docker-Compose**
 - **cURL, wget, tar**
 
-## Instalação e Configuração
+## Installation and Setup
 
-Siga os passos abaixo para configurar o projeto em sua máquina:
+Follow the steps below to set up the project on your machine:
 
-1. Clone este repositório:
+1. Clone these repositories:
    ```bash
-   git clone https://github.com/CarlosMikaelCardoso/besu-production-docker.git
+   git clone https://github.com/CarlosMikaelCardoso/Jmeter_VS_Caliper.git
+   git clone https://github.com/hyperledger-caliper/caliper-benchmarks.git
+   cd caliper-benchmarks
+   git checkout v0.6.0
    ```
-2. Execute o script de configuração da rede. Ele irá preparar todos os arquivos necessários para os nós.
+   1.2 Configuration of nodes:
+      ```bash
+      Go to ./Jmeter_VS_Caliper/update-docker-compose.py and change the 22 and 24 (<your IP>) by your IP address
+      ```
+2. Execute the network setup script. It will prepare all the necessary files for the nodes.
    ```bash
    chmod +x setup_besu_networks.sh
    ./setup_besu_networks.sh
    ```
 
-## Deploy e Teste de Contratos
+## Testing with Caliper and JMeter
 
-Com a rede em execução, utilize o script `besu_smart_contracts` para automatizar o deploy e a interação com seus contratos.
+### If you want to compare the performance of the two, it's recommended to run Caliper first, as it deploys the contract that JMeter will use for its tests.
+In the `testes` folder, edit the "url" in `networkconfig.json` and set the machine's IP address.
 
-1. Dê permissão de execução ao script:
+# Caliper
+```bash
+cd testes
+./run_caliper.sh <number of users> <number of repetitions>
+```
+By default, Caliper runs the test once with 5 Workers.
+
+# JMeter
+For JMeter, we need to run the API so it can perform the operations.
+
+```bash
+cd api-besu
+npm install # Installs the API dependencies
+# Export the necessary environment variables for the Besu configuration.
+export DEPLOYER_PRIVATE_KEY="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
+export CONTRACT_ADDRESS="<contract_address>" # This address is located in /testes/contract_address.txt
+node api_load_balancer
+```
+In another terminal:
+
+```bash
+cd Jmeter_VS_Caliper/testes
+./run_jmeter_api.sh <number of users> <number of repetitions>
+```
+By default, JMeter runs the test once with 5 Threads.
+
+At the end of each `.sh` script execution, a folder is generated containing log files and test results.
+You can modify the Caliper configuration file - `5_Users/caliper/simple/config.yaml` - to define the number of Workers and the number of transactions to be performed. Similarly, for JMeter, you can modify the JMX files - `5_users/jmeter/*.jmx` - which are split into three separate files for each operation (Open, Query, and Transfer).
+
+## Contribution
+
+Contributions are welcome! Follow the steps below to contribute:
+
+1. Fork the repository.
+2. Create a branch for your feature/bugfix:
    ```bash
-   chmod +x besu_smart_contracts.sh
+   git checkout -b my-feature
    ```
-2. Execute o script para implantar e testar os contratos:
+3. Commit your changes:
    ```bash
-   ./besu_smart_contracts.sh
+   git commit -m "feat: My new feature"
    ```
-
-## Contribuição
-
-Contribuições são bem-vindas! Siga os passos abaixo para contribuir:
-
-1. Faça um fork do repositório.
-2. Crie uma branch para sua feature/bugfix:
+4. Push to the branch:
    ```bash
-   git checkout -b minha-feature
+   git push origin my-feature
    ```
-3. Faça commit das suas alterações:
-   ```bash
-   git commit -m "feat: Minha nova feature"
-   ```
-4. Envie para o repositório:
-   ```bash
-   git push origin minha-feature
-   ```
-5. Abra um Pull Request.
+5. Open a Pull Request.
 
-## Contato
+## Contact
 
-Se tiver dúvidas ou sugestões, entre em contato:
+If you have questions or suggestions, get in touch:
 
-- **Desenvolvedor:** Carlos Mikael Cardoso
+- **Developer:** Carlos Mikael Cardoso Da Costa
 - **Email:** mikael.cardoso.costa13@gmail.com
 
-## Licença
+## License
 
-Este projeto está licenciado sob a [Licença MIT](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-Obrigado por usar este projeto!
+Thank you for using this project!

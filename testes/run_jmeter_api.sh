@@ -4,7 +4,7 @@
 JMETER_VERSION="5.6.3"
 JMETER_DIR="apache-jmeter-${JMETER_VERSION}"
 JMETER_URL="https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
-CONTRACT_ADDRESS_FILE="contract_address.txt"
+CONTRACT_ADDRESS_FILE="./contract_address.txt"
 API_HOST=$(hostname -I | awk '{print $1}') # IP da VM onde a API está a correr
 
 # Parâmetros de execução

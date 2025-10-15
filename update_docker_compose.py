@@ -19,9 +19,9 @@ def get_enode(node_number):
             return None
         # Modifica o IP no enode para 127.0.0.1 e a porta para 30303 para Node-1 e 30305 para Node-3
         if node_number == 1:
-            enode = re.sub(r'@\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+', '@10.126.1.232:30303', enode)
+            enode = re.sub(r'@\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+', '@<your IP>:30303', enode)
         elif node_number == 3:
-            enode = re.sub(r'@\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+', '@10.126.1.232:30305', enode)
+            enode = re.sub(r'@\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+', '@<your IP>:30305', enode)
         return enode
     except subprocess.CalledProcessError as e:
         print(f"Erro ao obter enode para Node-{node_number}: {e}")
