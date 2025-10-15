@@ -25,8 +25,19 @@ esac
 # Cálculo dinâmico de transações
 BASE_ACCOUNTS=1000
 BASE_TRANSFER_TX=50
-NUMBER_OF_ACCOUNTS=$((BASE_ACCOUNTS * NUM_REPETITIONS))
-TRANSFER_TX_NUMBER=$((BASE_TRANSFER_TX * NUM_REPETITIONS))
+# MODIFICAÇÃO: Ajustado para refletir o número de loops no JMX, não repetições do script.
+# O número total de amostras será (num_threads * loops)
+if [ "$NUM_USERS" -eq 5 ]; then
+    OPEN_LOOPS=200; QUERY_LOOPS=200; TRANSFER_LOOPS=10;
+elif [ "$NUM_USERS" -eq 10 ]; then
+    OPEN_LOOPS=100; QUERY_LOOPS=100; TRANSFER_LOOPS=5;
+elif [ "$NUM_USERS" -eq 25 ]; then
+    OPEN_LOOPS=40; QUERY_LOOPS=40; TRANSFER_LOOPS=2;
+elif [ "$NUM_USERS" -eq 50 ]; then
+    OPEN_LOOPS=20; QUERY_LOOPS=20; TRANSFER_LOOPS=1;
+fi
+NUMBER_OF_ACCOUNTS=$((NUM_USERS * OPEN_LOOPS))
+TRANSFER_TX_NUMBER=$((NUM_USERS * TRANSFER_LOOPS))
 
 # Configurações do Java
 JAVA_DIR_NAME="jdk-21.0.7"
@@ -90,12 +101,59 @@ generate_caliper_style_accounts_csv() {
     echo "${TRANSFER_TX_NUMBER} pares de transferência gerados."
 }
 
+wait_for_queue_and_check_errors() {
+    local round_name=$1
+    local run_number=$2
+    local error_log_file="$JMETER_RUNS_DIR/backend_errors.log"
+
+    echo "--- Sincronizando: Aguardando a finalização do processamento da API para a rodada '$round_name' ---"
+    
+    while true; do
+        # Tenta obter o status da API. O '-f' falha silenciosamente em erros de HTTP (ex: 404, 500)
+        status_output=$(curl -s -f http://${API_HOST}:3000/queue/status)
+        
+        # Verifica se o curl teve sucesso e se a resposta é um JSON válido
+        if [ $? -eq 0 ] && echo "$status_output" | jq -e . > /dev/null 2>&1; then
+            if echo "$status_output" | jq -e '.isIdle == true'; then
+                echo "API finalizou o processamento da fila."
+                break
+            fi
+        fi
+        
+        echo -n "."
+        sleep 2
+    done
+
+    echo "Verificando se ocorreram erros assíncronos no servidor..."
+    errors_output=$(curl -s http://${API_HOST}:3000/errors/get)
+    
+    # Verifica se a resposta de erros é um JSON válido antes de tentar processar
+    if echo "$errors_output" | jq -e . > /dev/null 2>&1; then
+        error_count=$(echo "$errors_output" | jq '.errors | length')
+        
+        if [ "$error_count" -gt 0 ]; then
+            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            echo "AVISO: Foram detectados $error_count erros de processamento no back-end!"
+            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            # Grava a contagem de erros para o script de gráficos usar
+            echo "$round_name,$run_number,$error_count,$(echo "$errors_output" | jq -c .)" >> "$error_log_file"
+        else
+            echo "Nenhum erro de processamento assíncrono encontrado."
+        fi
+    else
+        echo "Aviso: Não foi possível obter uma resposta JSON válida do endpoint de erros."
+    fi
+
+    # Limpa sempre os erros na API para a próxima rodada
+    curl -s -X POST http://${API_HOST}:3000/errors/clear > /dev/null
+}
+
 run_test_and_monitor() {
     local JMX_FILE=$1
     local ROUND_NAME=$2
     local RUN_NUMBER=$3
     local CSV_FILE_PATH=$4
-    local EXPECTED_SAMPLES=$5
+    local IS_WRITE_OPERATION=$5 # Novo parâmetro para saber se é 'open' ou 'transfer'
 
     local JTL_FILE="$JMETER_RUNS_DIR/results_${ROUND_NAME,,}_run_${RUN_NUMBER}.jtl"
     local DOCKER_STATS_LOG_PATH="$JMETER_RUNS_DIR/docker_stats_${ROUND_NAME,,}_run_${RUN_NUMBER}.log"
@@ -112,27 +170,15 @@ run_test_and_monitor() {
         -JcsvDataFile="$CSV_FILE_PATH" \
         -JapiHost="$API_HOST"
 
-    echo "A aguardar a finalização da escrita dos logs do JMeter..."
-    local start_time=$(date +%s)
-    local expected_lines=$((EXPECTED_SAMPLES + 1))
-
-    while true; do
-        if [ -f "$JTL_FILE" ] && [ $(wc -l < "$JTL_FILE") -ge $expected_lines ]; then
-            echo "Ficheiro JTL completo encontrado."
-            break
-        fi
-        local current_time=$(date +%s)
-        if [ $((current_time - start_time)) -gt 30 ]; then
-            echo "Aviso: Timeout à espera do ficheiro JTL. O relatório pode estar incompleto."
-            break
-        fi
-        sleep 1
-    done
-
     echo "Parando monitoramento remoto na API..."
     curl -s -X POST -H "Content-Type: application/json" \
         -d "{\"roundName\": \"${ROUND_NAME}\", \"runNumber\": \"${RUN_NUMBER}\"}" \
         http://${API_HOST}:3000/monitor/stop
+
+    # *** AQUI ESTÁ A LÓGICA DE SINCRONIZAÇÃO ***
+    if [ "$IS_WRITE_OPERATION" = true ]; then
+        wait_for_queue_and_check_errors "$ROUND_NAME" "$RUN_NUMBER"
+    fi
 
     echo "A descarregar o ficheiro de log de monitoramento..."
     curl -s -o "$DOCKER_STATS_LOG_PATH" "http://${API_HOST}:3000/monitor/logs/${ROUND_NAME}/${RUN_NUMBER}"
@@ -166,22 +212,22 @@ CONTRACT_ADDRESS=$(<"$CONTRACT_ADDRESS_FILE")
 
 generate_caliper_style_accounts_csv
 
+# Limpa qualquer erro antigo na API antes de começar
+curl -s -X POST http://${API_HOST}:3000/errors/clear > /dev/null
+
 # Execução em Loop
 for (( i=1; i<=$NUM_REPETITIONS; i++ ))
 do
     echo -e "\n--- Iniciando Execução JMeter #$i de $NUM_REPETITIONS ---"
     
-    run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" "$NUMBER_OF_ACCOUNTS"
-    run_test_and_monitor "$JMX_QUERY" "Query" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" "$NUMBER_OF_ACCOUNTS"
-    run_test_and_monitor "$JMX_TRANSFER" "Transfer" "$i" "$JMETER_RUNS_DIR/transfer_accounts.csv" "$TRANSFER_TX_NUMBER"
-
-    # A geração de relatórios HTML e gráficos foi movida para fora do loop
+    # run_test_and_monitor <jmx_file> <round_name> <run_number> <csv_file> <is_write_operation>
+    run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" true
+    run_test_and_monitor "$JMX_QUERY" "Query" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" false
+    run_test_and_monitor "$JMX_TRANSFER" "Transfer" "$i" "$JMETER_RUNS_DIR/transfer_accounts.csv" true
 done
 
 echo -e "\n--- Gerando gráficos e relatórios consolidados de todas as execuções... ---"
 python3 generateGraphs.py "$JMETER_RUNS_DIR"
-# Se ainda quiser relatórios HTML individuais por execução, pode chamar a função generate_html_report aqui dentro do loop.
 
 echo -e "\nExecução do JMeter concluída!"
 echo "Verifique os relatórios e gráficos gerados no diretório: $JMETER_RUNS_DIR/"
-
