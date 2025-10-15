@@ -229,16 +229,24 @@ def main():
                 jmeter_failures = summary_df['Falha'].sum()
                 backend_failures = backend_errors.get(round_name, 0)
                 total_failures = jmeter_failures + backend_failures
-
+                
+                # --- MODIFICAÇÃO INICIA AQUI ---
+                # O número total de amostras é a soma de todas as tentativas.
+                total_amostras = summary_df['Total de Amostras'].sum()
+                
+                # O número correto de sucessos é o total de amostras MENOS o total de falhas de TODAS as fontes.
+                sucesso_corrigido = total_amostras - total_failures
+                
                 final_summary_data = {
-                    'Total de Amostras': summary_df['Total de Amostras'].sum(),
-                    'Sucesso': summary_df['Sucesso'].sum(),
+                    'Total de Amostras': total_amostras,
+                    'Sucesso': sucesso_corrigido, # <- Alterado de summary_df['Sucesso'].sum() para o valor corrigido
                     'Falha': total_failures,
                     'Latência Média (ms)': summary_df['Latência Média (ms)'].mean(),
                     'Latência Mínima (ms)': summary_df['Latência Mínima (ms)'].mean(),
                     'Latência Máxima (ms)': summary_df['Latência Máxima (ms)'].mean(),
                     'Throughput Médio (TPS)': summary_df['Throughput Médio (TPS)'].mean()
                 }
+                # --- MODIFICAÇÃO TERMINA AQUI ---
 
                 print(f"  -> Resumo da rodada '{round_name}': {final_summary_data['Sucesso']:.0f} Sucessos, {jmeter_failures:.0f} Falhas (JMeter), {backend_failures} Falhas (API)")
                 
