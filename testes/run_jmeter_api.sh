@@ -77,6 +77,7 @@ generate_caliper_style_accounts_csv() {
     echo "Gerando arquivos CSV de contas (um por thread)..."
     local accounts_file="$JMETER_RUNS_DIR/all_accounts.txt"
     local open_csv_prefix="$JMETER_RUNS_DIR/open_accounts_thread_"
+    local open_csv="$JMETER_RUNS_DIR/open_accounts.csv"
     local transfer_csv="$JMETER_RUNS_DIR/transfer_accounts.csv"
     
     # Apaga contas antigas para garantir que não haja lixo de execuções anteriores
@@ -103,10 +104,16 @@ generate_caliper_style_accounts_csv() {
             // Gera um CSV para cada thread
             fs.writeFileSync(\`${open_csv_prefix}\${threadNum}.csv\`, 'accountId\n' + thread_accounts.join('\n'));
         }
-        
-        // Mantém um arquivo com todas as contas para a lógica de transferência
+
+                // Mantém um arquivo com todas as contas para a lógica de transferência
         fs.writeFileSync('${accounts_file}', total_accounts.join('\n'));
         console.log('${NUMBER_OF_ACCOUNTS} contas geradas e divididas em ${NUM_USERS} arquivos.');
+
+        const accounts = [];
+        for (let i = 0; i < ${NUMBER_OF_ACCOUNTS}; i++) { accounts.push('userJmeter' + get26Num(i)); }
+        fs.writeFileSync('${open_csv}', 'accountId\n' + accounts.join('\n'));
+        fs.writeFileSync('${accounts_file}', accounts.join('\n'));
+        console.log('${NUMBER_OF_ACCOUNTS} contas geradas para os testes open');
     "
     if [ $? -ne 0 ]; then echo "Erro: Falha ao gerar contas com Node.js."; exit 1; fi
 
@@ -242,7 +249,7 @@ do
     echo -e "\n--- Iniciando Execução JMeter #$i de $NUM_REPETITIONS ---"
     
     # run_test_and_monitor <jmx_file> <round_name> <run_number> <csv_file> <is_write_operation>
-    run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts_thread_" true
+    run_test_and_monitor "$JMX_OPEN" "Open" "$i" "$JMETER_RUNS_DIR/open_accounts.csv" true
     run_test_and_monitor "$JMX_QUERY" "Query" "$i" "$JMETER_RUNS_DIR/open_accounts_thread_" false
     run_test_and_monitor "$JMX_TRANSFER" "Transfer" "$i" "$JMETER_RUNS_DIR/transfer_accounts.csv" true
 
