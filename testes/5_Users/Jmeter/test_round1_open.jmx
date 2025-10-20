@@ -21,7 +21,7 @@
       </ThreadGroup>
       <hashTree>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="CSV Data Set Config">
-          <stringProp name="filename">${__P(csvDataFile)}${__threadNum}.csv</stringProp>
+          <stringProp name="filename">${__P(csvDataFile)}</stringProp>
           <stringProp name="fileEncoding">UTF-8</stringProp>
           <stringProp name="variableNames">accountId</stringProp>
           <boolProp name="ignoreFirstLine">true</boolProp>
