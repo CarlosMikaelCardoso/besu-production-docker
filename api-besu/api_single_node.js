@@ -1,7 +1,7 @@
 // Exporta as variáveis de ambiente necessárias para a configuração do Besu.
-// export BESU_RPC_URL="http://localhost:8545"
 // export DEPLOYER_PRIVATE_KEY="0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
-// export CONTRACT_ADDRESS="0x65276fE40CdA3B0A0b466e3e61ea6d822b5aEC0f"
+// export CONTRACT_ADDRESS="0x42699A7612A82f1d9C36148af9C77354759b210b"
+// export API_WORKERS=5 (Define o número de workers concorrentes)
 
 const express = require('express');
 const { spawn } = require('child_process');
@@ -9,34 +9,201 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const Docker = require('dockerode');
-const docker = new Docker();
 const { ethers } = require('ethers');
 
-// --- MODIFICAÇÃO: Importar as classes de workload refatoradas ---
+const docker = new Docker();
+
+// Importar as classes de workload refatoradas
 const OpenWorkload = require('./workloads/open.js');
 const QueryWorkload = require('./workloads/query.js');
 const TransferWorkload = require('./workloads/transfer.js');
-// ----------------------------------------------------------------
 
 const app = express();
 const port = 3000;
 app.use(express.json());
 
-// --- Configuração das Variáveis de Ambiente ---
+// Configuração das Variáveis de Ambiente
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
-const BESU_RPC_URL = process.env.BESU_RPC_URL || "http://localhost:8545";
 
 if (!DEPLOYER_PRIVATE_KEY || !CONTRACT_ADDRESS) {
     console.error("Erro Crítico: As variáveis de ambiente DEPLOYER_PRIVATE_KEY e CONTRACT_ADDRESS são obrigatórias.");
     process.exit(1);
 }
 
-// --- MODIFICAÇÃO: Instanciar as classes de workload com as configurações ---
-const openWorkload = new OpenWorkload(BESU_RPC_URL, DEPLOYER_PRIVATE_KEY, CONTRACT_ADDRESS);
-const queryWorkload = new QueryWorkload(BESU_RPC_URL, DEPLOYER_PRIVATE_KEY, CONTRACT_ADDRESS);
-const transferWorkload = new TransferWorkload(BESU_RPC_URL, DEPLOYER_PRIVATE_KEY, CONTRACT_ADDRESS);
-// -------------------------------------------------------------------------
+// --- MODIFICAÇÃO: Lógica de Nó Único ---
+// Define o número de workers (instâncias/concorrência) com base na variável de ambiente
+const NUM_WORKERS = parseInt(process.env.API_WORKERS || '5', 10);
+// Define a URL estática para o node1
+const BESU_RPC_URL = "http://localhost:8545"; // Apenas node1
+
+// --- MODIFICAÇÃO: Criar um pool de workers (instâncias) que apontam TODOS para o Node1 ---
+const workerInstances = [];
+for (let i = 0; i < NUM_WORKERS; i++) {
+    workerInstances.push({
+        open: new OpenWorkload(BESU_RPC_URL, DEPLOYER_PRIVATE_KEY, CONTRACT_ADDRESS),
+        query: new QueryWorkload(BESU_RPC_URL, DEPLOYER_PRIVATE_KEY, CONTRACT_ADDRESS),
+        transfer: new TransferWorkload(BESU_RPC_URL, DEPLOYER_PRIVATE_KEY, CONTRACT_ADDRESS),
+        nodeUrl: BESU_RPC_URL, // Para fins de log
+        index: i
+    });
+}
+console.log(`Instanciados ${workerInstances.length} pools de workload para ${BESU_RPC_URL}`);
+
+let currentWorkerIndex = 0;
+
+// --- MODIFICAÇÃO: Balanceador agora é um simples Round-Robin sobre as *instâncias* de worker ---
+const getNextWorker = () => {
+    const worker = workerInstances[currentWorkerIndex];
+    currentWorkerIndex = (currentWorkerIndex + 1) % workerInstances.length;
+    // console.log(`Encaminhando para worker instance: ${worker.index}`); // Descomente para debug
+    return worker;
+};
+
+const getNextOpenWorkload = () => getNextWorker().open;
+const getNextQueryWorkload = () => getNextWorker().query;
+const getNextTransferWorkload = () => getNextWorker().transfer;
+// --- FIM DAS MODIFICAÇÕES DE BALANCEAMENTO ---
+
+
+// --- Gestor de Nonce Unificado com Auto-Recuperação ---
+class NonceManager {
+    constructor(provider, signer) {
+        this.provider = provider;
+        this.signer = signer;
+        this.nonce = -1;
+        this.lock = Promise.resolve();
+        this.initialize();
+    }
+
+    async initialize() {
+        try {
+            this.nonce = await this.provider.getTransactionCount(this.signer.address, "pending");
+            console.log(`Gestor de Nonce inicializado. Nonce inicial: ${this.nonce}`);
+        } catch (e) {
+            console.error("Falha crítica ao inicializar o gestor de nonce:", e);
+            process.exit(1);
+        }
+    }
+
+    async getNextNonce() {
+        await this.lock;
+        let releaseLock;
+        this.lock = new Promise(resolve => { releaseLock = resolve; });
+
+        try {
+            const nonceToUse = this.nonce;
+            this.nonce++;
+            return nonceToUse;
+        } finally {
+            releaseLock();
+        }
+    }
+
+    async resyncNonce() {
+        await this.lock;
+        let releaseLock;
+        this.lock = new Promise(resolve => { releaseLock = resolve; });
+
+        try {
+            console.log("!!! RESSINCRONIZANDO NONCE !!!");
+            const freshNonce = await this.provider.getTransactionCount(this.signer.address, "pending");
+            
+            if (freshNonce > this.nonce) {
+                console.log(`Nonce dessincronizado. Atualizando de ${this.nonce} para ${freshNonce}.`);
+                this.nonce = freshNonce;
+            } else {
+                console.log(`Nonce já estava correto ou adiantado (${this.nonce}). Nenhuma alteração necessária.`);
+            }
+        } catch (e) {
+            console.error("Erro durante a ressincronização do nonce:", e);
+        } finally {
+            releaseLock();
+        }
+    }
+}
+
+// MODIFICAÇÃO: Provider do NonceManager aponta para a URL única
+const provider = new ethers.JsonRpcProvider(BESU_RPC_URL); 
+const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
+const nonceManager = new NonceManager(provider, signer);
+
+// --- Fila de Trabalhos (Job Queue) ---
+let processingErrors = [];
+
+class JobQueue {
+    constructor(concurrency) {
+        this.queue = [];
+        this.workers = [];
+        this.concurrency = concurrency;
+        console.log(`Fila de trabalhos iniciada com ${concurrency} workers.`);
+    }
+
+    addJob(job) {
+        this.queue.push(job);
+        this.processQueue();
+    }
+    
+    isIdle() {
+        return this.queue.length === 0 && this.workers.length === 0;
+    }
+
+    processQueue() {
+        if (this.queue.length > 0 && this.workers.length < this.concurrency) {
+            const job = this.queue.shift();
+            const worker = this.runWorker(job);
+            this.workers.push(worker);
+
+            worker.finally(() => {
+                this.workers = this.workers.filter(w => w !== worker);
+                this.processQueue();
+            });
+        }
+    }
+
+    async runWorker(job) {
+        try {
+            const nonceToUse = await nonceManager.getNextNonce();
+            await job(nonceToUse);
+        } catch (error) {
+            console.error("Erro ao processar trabalho da fila:", error.message);
+            processingErrors.push({
+                timestamp: new Date().toISOString(),
+                error: error.message,
+                reason: error.reason || 'N/A',
+                code: error.code || 'N/A'
+            });
+
+            const errorMessage = (error.error && error.error.message) || error.message || '';
+            if (errorMessage.includes('nonce') || errorMessage.includes('Nonce')) {
+                await nonceManager.resyncNonce();
+            }
+        }
+    }
+}
+
+// MODIFICAÇÃO: Concorrência da fila agora usa a variável NUM_WORKERS
+const writeQueue = new JobQueue(NUM_WORKERS);
+
+// --- Endpoints de Controle ---
+app.get('/queue/status', (req, res) => {
+    res.status(200).json({
+        isIdle: writeQueue.isIdle(),
+        queueSize: writeQueue.queue.length,
+        activeWorkers: writeQueue.workers.length
+    });
+});
+
+app.get('/errors/get', (req, res) => {
+    res.status(200).json({ errors: processingErrors });
+});
+
+app.post('/errors/clear', (req, res) => {
+    console.log("Limpando log de erros de processamento.");
+    processingErrors = [];
+    res.status(200).json({ message: "Log de erros limpo." });
+});
+
 // --- Lógica de Monitoramento do Docker (sem alterações) ---
 const monitoringProcesses = {};
 const DOCKER_CONTAINERS_TO_MONITOR = ["node1", "node2", "node3", "node4", "node5", "node6"];
@@ -44,29 +211,6 @@ const LOG_DIR = path.join(os.tmpdir(), 'jmeter_docker_logs');
 if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
 }
-
-let noncePromise;
-let signerAddress; // Variável para guardar o endereço
-
-try {
-    const provider = new ethers.JsonRpcProvider(BESU_RPC_URL);
-    const signer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
-    signerAddress = signer.address; // Guardamos o endereço do signer
-
-    // A forma correta em ethers.js v6: chama-se getTransactionCount no provider, passando o endereço.
-    noncePromise = provider.getTransactionCount(signerAddress, "pending");
-
-    console.log(`Nonce inicial obtido com sucesso para o endereço ${signerAddress}.`);
-} catch (e) {
-    console.error("Falha ao inicializar o gestor de nonce:", e);
-    process.exit(1);
-}
-
-const getNextNonce = async () => {
-    const nonce = await noncePromise;
-    noncePromise = Promise.resolve(nonce + 1);
-    return nonce;
-};
 
 app.post('/monitor/start', (req, res) => {
     const { roundName, runNumber } = req.body;
@@ -77,7 +221,7 @@ app.post('/monitor/start', (req, res) => {
         return res.status(409).json({ message: `O monitoramento para ${runId} já está em execução.` });
     }
 
-    console.log(`Iniciando monitoramento (método Caliper) para: ${runId}. A gravar em: ${logPath}`);
+    console.log(`Iniciando monitoramento para: ${runId}. A gravar em: ${logPath}`);
     const logStream = fs.createWriteStream(logPath, { flags: 'w' });
 
     const streams = DOCKER_CONTAINERS_TO_MONITOR.map(containerName => {
@@ -87,34 +231,38 @@ app.post('/monitor/start', (req, res) => {
                 if (err) return reject(err);
 
                 stream.on('data', (chunk) => {
-                    const stats = JSON.parse(chunk.toString());
-                    const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
-                    const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
-                    const cpuCount = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage.percpu_usage.length;
-                    let cpuPercent = 0.0;
-                    if (systemDelta > 0.0 && cpuDelta > 0.0) {
-                        cpuPercent = (cpuDelta / systemDelta) * cpuCount * 100.0;
+                    try {
+                        const stats = JSON.parse(chunk.toString());
+                        const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+                        const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+                        const cpuCount = stats.cpu_stats.online_cpus || (stats.cpu_stats.cpu_usage.percpu_usage ? stats.cpu_stats.cpu_usage.percpu_usage.length : 0);
+                        let cpuPercent = 0.0;
+                        if (systemDelta > 0.0 && cpuDelta > 0.0 && cpuCount > 0) {
+                            cpuPercent = (cpuDelta / systemDelta) * cpuCount * 100.0;
+                        }
+                        const memUsage = (stats.memory_stats.usage / (1024 * 1024)).toFixed(2);
+                        let netRx = 0, netTx = 0, diskRead = 0, diskWrite = 0;
+                        if (stats.networks) {
+                            Object.values(stats.networks).forEach(net => {
+                                netRx += net.rx_bytes;
+                                netTx += net.tx_bytes;
+                            });
+                        }
+                        if (stats.blkio_stats && stats.blkio_stats.io_service_bytes_recursive) {
+                            stats.blkio_stats.io_service_bytes_recursive.forEach(io => {
+                                if (io.op === 'Read') diskRead += io.value;
+                                if (io.op === 'Write') diskWrite += io.value;
+                            });
+                        }
+                        const netRxKB = (netRx / 1024).toFixed(2);
+                        const netTxKB = (netTx / 1024).toFixed(2);
+                        const diskReadKB = (diskRead / 1024).toFixed(2);
+                        const diskWriteKB = (diskWrite / 1024).toFixed(2);
+                        const logLine = `${stats.name.substring(1)},${cpuPercent.toFixed(2)}%,${memUsage}MiB,${netRxKB}KB,${netTxKB}KB,${diskReadKB}KB,${diskWriteKB}KB\n`;
+                        logStream.write(logLine);
+                    } catch (e) {
+                        console.error("Erro ao fazer parse das estatísticas do Docker:", e);
                     }
-                    const memUsage = (stats.memory_stats.usage / (1024 * 1024)).toFixed(2);
-                    let netRx = 0, netTx = 0, diskRead = 0, diskWrite = 0;
-                    if (stats.networks) {
-                        Object.values(stats.networks).forEach(net => {
-                            netRx += net.rx_bytes;
-                            netTx += net.tx_bytes;
-                        });
-                    }
-                    if (stats.blkio_stats && stats.blkio_stats.io_service_bytes_recursive) {
-                        stats.blkio_stats.io_service_bytes_recursive.forEach(io => {
-                            if (io.op === 'Read') diskRead += io.value;
-                            if (io.op === 'Write') diskWrite += io.value;
-                        });
-                    }
-                    const netRxKB = (netRx / 1024).toFixed(2);
-                    const netTxKB = (netTx / 1024).toFixed(2);
-                    const diskReadKB = (diskRead / 1024).toFixed(2);
-                    const diskWriteKB = (diskWrite / 1024).toFixed(2);
-                    const logLine = `${stats.name.substring(1)},${cpuPercent.toFixed(2)}%,${memUsage}MiB,${netRxKB}KB,${netTxKB}KB,${diskReadKB}KB,${diskWriteKB}KB\n`;
-                    logStream.write(logLine);
                 });
 
                 stream.on('end', resolve);
@@ -155,53 +303,41 @@ app.get('/monitor/logs/:roundName/:runNumber', (req, res) => {
     if (fs.existsSync(logPath)) res.sendFile(logPath);
     else res.status(404).send('Ficheiro de log não encontrado.');
 });
-// ----------------------------------------------------------
 
-// --- MODIFICAÇÃO: Endpoints agora usam os módulos de workload ---
-
-// --- Endpoint Assíncrono para 'open' ---
-app.post('/open-async', async (req, res) => {
+// --- Endpoints ---
+app.post('/open-async', (req, res) => {
     const { accountId, amount } = req.body;
-    if (!accountId || amount === undefined) {
-        return res.status(400).json({ error: "Campos 'accountId' e 'amount' são obrigatórios." });
-    }
-    try {
-        const nonce = await getNextNonce(); // Obtém o próximo nonce
-        const txResponse = await openWorkload.submitTransaction(accountId, amount, nonce);
-        console.log(`(Async) Transação 'open' para a conta ${accountId} submetida. Hash: ${txResponse.hash}, Nonce: ${nonce}`);
-        res.status(202).json({ message: `Transação 'open' aceite para processamento.`, transactionHash: txResponse.hash });
-    } catch (error) {
-        console.error(`(Async) Erro ao submeter transação 'open' para ${accountId}:`, error);
-        res.status(500).json({ error: "Falha ao submeter a transação 'open'.", details: error.message });
-    }
+    if (!accountId || amount === undefined) return res.status(400).json({ error: "Campos 'accountId' e 'amount' são obrigatórios." });
+
+    writeQueue.addJob(async (nonce) => {
+        const workload = getNextOpenWorkload();
+        const txResponse = await workload.submitTransaction(accountId, amount, nonce);
+        console.log(`(Fila) Transação 'open' para ${accountId} submetida. Hash: ${txResponse.hash}, Nonce: ${nonce}`);
+    });
+
+    res.status(202).json({ message: `Transação 'open' para ${accountId} enfileirada com sucesso.` });
 });
 
-// --- Endpoint Assíncrono para 'transfer' ---
-app.post('/transfer-async', async (req, res) => {
+app.post('/transfer-async', (req, res) => {
     const { from, to, amount } = req.body;
-    if (!from || !to || amount === undefined) {
-        return res.status(400).json({ error: "Os campos 'from', 'to' e 'amount' são obrigatórios." });
-    }
-    try {
-        const nonce = await getNextNonce(); // Obtém o próximo nonce
-        const txResponse = await transferWorkload.submitTransaction(from, to, amount, nonce);
-        console.log(`(Async) Transação 'transfer' de ${from} para ${to} submetida. Hash: ${txResponse.hash}, Nonce: ${nonce}`);
-        res.status(202).json({ message: "Transação 'transfer' aceite para processamento.", transactionHash: txResponse.hash });
-    } catch (error) {
-        console.error(`(Async) Erro ao submeter transação 'transfer' de ${from} para ${to}:`, error);
-        res.status(500).json({ error: "Falha ao submeter a transação 'transfer'.", details: error.message });
-    }
+    if (!from || !to || amount === undefined) return res.status(400).json({ error: "Os campos 'from', 'to' e 'amount' são obrigatórios." });
+
+    writeQueue.addJob(async (nonce) => {
+        const workload = getNextTransferWorkload();
+        const txResponse = await workload.submitTransaction(from, to, amount, nonce);
+        console.log(`(Fila) Transação 'transfer' de ${from} para ${to} submetida. Hash: ${txResponse.hash}, Nonce: ${nonce}`);
+    });
+
+    res.status(202).json({ message: "Transação 'transfer' enfileirada com sucesso." });
 });
 
-// --- Endpoint Síncrono para 'query' ---
 app.get('/query/:accountId', async (req, res) => {
     const { accountId } = req.params;
-    if (!accountId) {
-        return res.status(400).json({ error: "O campo 'accountId' é obrigatório." });
-    }
+    if (!accountId) return res.status(400).json({ error: "O campo 'accountId' é obrigatório." });
+
     try {
-        const balance = await queryWorkload.submitTransaction(accountId);
-        console.log(`Consulta para conta: ${accountId}, Saldo encontrado: ${balance.toString()}`);
+        const workload = getNextQueryWorkload();
+        const balance = await workload.submitTransaction(accountId);
         res.status(200).json({ accountId: accountId, balance: balance.toString() });
     } catch (error) {
         console.error(`Falha ao executar 'query' para a conta ${accountId}:`, error);
@@ -209,11 +345,11 @@ app.get('/query/:accountId', async (req, res) => {
     }
 });
 
-// -------------------------------------------------------------
-
 // --- Iniciar o Servidor ---
 app.listen(port, () => {
-    console.log(`Servidor da API (Nó Único) a correr em http://localhost:${port}`);
+    // MODIFICAÇÃO: Mensagem de log
+    console.log(`Servidor da API (Single Node - Node1) a correr em http://localhost:${port}`);
+    console.log(`API a usar ${NUM_WORKERS} workers.`);
     console.log(`A API está a enviar todos os pedidos para: ${BESU_RPC_URL}`);
     console.log(`Usando contrato no endereço: ${CONTRACT_ADDRESS}`);
 });
