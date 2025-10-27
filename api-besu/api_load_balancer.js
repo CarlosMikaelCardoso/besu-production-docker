@@ -205,7 +205,7 @@ class JobQueue {
     }
 }
 
-const writeQueue = new JobQueue(6);
+const writeQueue = new JobQueue(5);
 
 // --- Endpoints de Controle ---
 app.get('/queue/status', (req, res) => {
